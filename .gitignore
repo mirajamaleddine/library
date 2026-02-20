@@ -1,0 +1,49 @@
+# ── Node ──────────────────────────────────────────────
+node_modules/
+dist/
+build/
+.cache/
+.turbo/
+*.tsbuildinfo
+
+# ── Yarn ──────────────────────────────────────────────
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# ── Python ────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+.eggs/
+.venv/
+venv/
+env/
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ── Env / secrets ─────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+
+# ── Editor ────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Testing ───────────────────────────────────────────
+coverage/
+.pytest_cache/
+htmlcov/

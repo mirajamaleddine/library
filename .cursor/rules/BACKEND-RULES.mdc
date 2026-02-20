@@ -1,0 +1,246 @@
+---
+alwaysApply: true
+---
+
+# BACKEND_RULES.md
+
+## Principles
+- Backend is the **source of truth** for auth + authorization + data integrity.
+- Keep it **simple, typed, validated, observable**, and deployable.
+
+---
+
+## Do / Don’t (High-level)
+
+### ✅ Do
+- Validate all inputs at the API boundary (schema validation).
+- Enforce authorization on every protected endpoint.
+- Use consistent error responses and HTTP status codes.
+- Keep business logic in services/use-cases, not in routes/controllers.
+- Use migrations for DB changes; keep schema controlled.
+- Use structured logging with request IDs.
+
+### ❌ Don’t
+- Don’t trust frontend input.
+- Don’t leak internal exceptions/messages to clients.
+- Don’t mix routing + DB logic + business logic in one file.
+- Don’t commit secrets.
+- Don’t build complex architecture (microservices, queues) for v1 unless required.
+
+---
+
+## Structure & Layering (recommended)
+- `routes/` — HTTP layer only
+- `schemas/` — request/response models
+- `services/` — business logic / use cases
+- `repos/` — persistence layer (DB access)
+- `domain/` — entities + pure logic
+- `core/` — config, auth, logging, middleware
+- `lib/` — utilities
+
+Rules:
+- Routes call services.
+- Services call repos.
+- Domain stays pure (no HTTP/DB imports).
+
+---
+
+## API Design Rules
+- Versioned: `/v1/...`
+- REST naming, plural resources.
+- Pagination via `cursor`/`limit`.
+- Consistent response envelopes when helpful.
+
+### Status Codes
+- `200` ok
+- `201` created
+- `204` no content (delete)
+- `400` invalid input
+- `401` unauthenticated
+- `403` unauthorized
+- `404` not found
+- `409` conflict (duplicate/constraint)
+- `429` rate limited
+- `500` internal
+
+---
+
+## Error Contract (required)
+Return:
+
+```json
+{
+  "error": {
+    "code": "STRING_CODE",
+    "message": "Human readable message",
+    "details": {}
+  }
+}
+````
+
+Rules:
+
+* `code` is stable and used by frontend.
+* `message` is safe to show.
+* `details` is optional and safe (no stack traces, no secrets).
+
+---
+
+## Validation Rules
+
+✅ Do
+
+* Validate request body/query/params using schemas.
+* Normalize validation errors into the error contract.
+* Validate types, lengths, enums, formats (email, uuid, etc).
+
+❌ Don’t
+
+* Don’t allow “free-form JSON” without validation.
+* Don’t accept unknown fields unless explicitly allowed.
+
+---
+
+## Authentication & Authorization (Claims-based)
+
+✅ Do
+
+* Verify JWT signature using JWKS from provider.
+* Check issuer (`iss`), audience (`aud`), expiration (`exp`).
+* Convert claims → permissions in a single module.
+* Enforce permission checks per endpoint.
+
+❌ Don’t
+
+* Don’t trust `role` without verification.
+* Don’t perform authorization in the frontend only.
+
+---
+
+## Database Rules
+
+✅ Do
+
+* Use migrations (Alembic/Prisma/etc).
+* Use transactions for multi-step writes.
+* Add indexes to frequent filters (e.g. `created_at`, `owner_id`, status).
+* Use explicit constraints (unique, foreign keys).
+
+❌ Don’t
+
+* Don’t do schema changes manually in production.
+* Don’t write raw SQL everywhere unless you need it.
+* Don’t allow N+1 query patterns.
+
+---
+
+## Service / Use Case Rules
+
+✅ Do
+
+* Services return domain objects or DTOs—not ORM models directly.
+* Keep functions small, deterministic where possible.
+* Name use cases clearly: `create_assessment`, `submit_assessment`.
+
+❌ Don’t
+
+* Don’t put business logic inside repo methods.
+* Don’t expose internal IDs/fields unless needed.
+
+---
+
+## Security Rules
+
+✅ Do
+
+* CORS allowlist only your frontend domains.
+* Rate limit login + write endpoints.
+* Sanitize file uploads; prefer object storage (S3/Supabase) over local disk.
+* Use HTTPS in production and secure cookies if using cookies.
+
+❌ Don’t
+
+* Don’t log credentials, tokens, or PII.
+* Don’t expose debug endpoints publicly.
+* Don’t allow broad wildcard CORS in prod.
+
+---
+
+## Observability & Logging
+
+✅ Do
+
+* Structured logs (JSON in prod).
+* Include request ID in:
+
+  * logs
+  * response headers (e.g. `X-Request-Id`)
+* Log at appropriate levels:
+
+  * `info`: requests, important events
+  * `warn`: recoverable issues
+  * `error`: failures
+
+❌ Don’t
+
+* Don’t spam logs with full payloads.
+* Don’t log stack traces to client responses.
+
+---
+
+## Performance
+
+✅ Do
+
+* Use pagination for list endpoints.
+* Avoid heavy serialization work per request.
+* Cache only if needed (prove bottleneck first).
+
+❌ Don’t
+
+* Don’t load full tables into memory.
+* Don’t do expensive work synchronously if it can be queued later (only if needed).
+
+---
+
+## Testing (Backend)
+
+✅ Do
+
+* Unit tests for domain + services.
+* Integration test for one or two key endpoints.
+* Use a test DB (or SQLite where acceptable) with clean setup/teardown.
+
+❌ Don’t
+
+* Don’t test only happy paths.
+* Don’t skip authorization tests on protected endpoints.
+
+---
+
+## Deployment Readiness
+
+✅ Do
+
+* Health check endpoint: `GET /health`
+* Config via env vars only
+* Separate dev vs prod settings
+* Database migrations run as part of deploy pipeline
+
+❌ Don’t
+
+* Don’t rely on local filesystem state in production.
+* Don’t hardcode URLs/ports.
+
+---
+
+## Dependency Discipline
+
+✅ Do
+
+* Prefer few, stable dependencies.
+* Add a dependency only if it materially improves correctness or speed.
+
+❌ Don’t
+
+* Don’t add frameworks/tools just because they’re popular.

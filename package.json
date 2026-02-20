@@ -1,0 +1,17 @@
+{
+  "private": true,
+  "name": "library-monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "yarn workspace web dev",
+    "dev:api": "echo 'Run API separately: cd apps/api && source .venv/bin/activate && uvicorn app.main:app --reload --port 8000'",
+    "lint": "prettier --check \"apps/web/src/**/*.{ts,tsx}\"",
+    "format": "prettier --write \"apps/web/src/**/*.{ts,tsx}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3"
+  }
+}

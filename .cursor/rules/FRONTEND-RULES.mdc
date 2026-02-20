@@ -1,0 +1,204 @@
+---
+alwaysApply: true
+---
+
+# FRONTEND_RULES.md
+
+## Stack & Conventions
+- **React + TypeScript** (strict mode), **TailwindCSS**, **shadcn/ui**.
+- Prefer **functional components**, **hooks**, and **composition**.
+- Prefer **feature-based** folder structure over “everything in components”.
+
+---
+
+## Do / Don’t (High-level)
+
+### ✅ Do
+- Keep UI components **presentational**; move logic to hooks/services.
+- Use **shadcn/ui components** first, then extend via variants.
+- Use **Tailwind tokens** (CSS variables) and consistent spacing/typography.
+- Ensure **a11y**: labels, aria attributes, focus rings, keyboard nav.
+- Keep code **readable**: small components, meaningful names, early returns.
+- Use **typed API client** and **typed DTOs** for all network calls.
+- Handle loading/error/empty states for every page that fetches data.
+- Use `cn()` (tailwind-merge + clsx) for class composition.
+
+### ❌ Don’t
+- Don’t call APIs inside low-level UI components (buttons, cards).
+- Don’t duplicate shadcn components—extend via props/variants instead.
+- Don’t inline huge Tailwind class strings repeatedly—extract variants.
+- Don’t store server state in global state if a query library can handle it.
+- Don’t overuse `useEffect` for derived state.
+- Don’t use `any`. Don’t use non-null assertions `!` unless justified.
+- Don’t rely on frontend-only auth checks for security.
+
+---
+
+## Project Structure Guidelines (suggested)
+- `src/routes/` or `src/pages/` — route-level pages
+- `src/features/<feature>/` — feature UI + hooks + api + types
+- `src/components/ui/` — shadcn generated components
+- `src/components/` — app-specific components
+- `src/lib/` — utilities (cn, formatters, constants)
+- `src/api/` — API client + fetch wrapper
+- `src/stores/` — minimal client state only (UI state, not server state)
+
+---
+
+## React Best Practices
+
+### Components
+✅ Do
+- Keep components < ~200 lines where possible.
+- Split “smart” and “dumb”:
+  - `FeatureContainer` (data + handlers)
+  - `FeatureView` (pure UI)
+- Use `memo` only when profiling shows benefit.
+
+❌ Don’t
+- Don’t lift state too high by default.
+- Don’t create “God components” that fetch, transform, and render everything.
+
+### Hooks
+✅ Do
+- Create hooks per feature: `useAssessments()`, `useCreateAssessment()`
+- Use stable callbacks (`useCallback`) only when it prevents re-renders.
+- Prefer derived values (`const fullName = ...`) over extra state.
+
+❌ Don’t
+- Don’t store derived state in `useState` unless necessary.
+- Don’t use effects to “sync” props into state unless unavoidable.
+
+---
+
+## TypeScript Rules
+✅ Do
+- Enable strict mode.
+- Use discriminated unions for state:
+  - `{ status: 'idle' | 'loading' | 'error' | 'success', data?: ... }`
+- Prefer `unknown` over `any`, then narrow.
+
+❌ Don’t
+- Don’t type API responses as `any`—always validate or narrow.
+- Don’t silence errors with `as Foo` unless you have validation.
+
+---
+
+## Styling Rules (Tailwind + shadcn/ui)
+
+### Tailwind
+✅ Do
+- Use design tokens (CSS variables used by shadcn theme).
+- Keep spacing consistent (`gap-2`, `p-4`, `rounded-2xl`).
+- Use responsive classes intentionally (`sm:`, `md:`, `lg:`).
+
+❌ Don’t
+- Don’t hardcode colors repeatedly (`text-[#123456]`)—use tokens.
+- Don’t stack 30+ classes on every element—extract to components/variants.
+
+### shadcn/ui
+✅ Do
+- Generate shadcn components into `src/components/ui`.
+- Extend components using:
+  - `className`
+  - `cva` variants
+  - wrapper components for app-specific use
+
+❌ Don’t
+- Don’t modify shadcn base components unless necessary; prefer wrappers.
+- Don’t fork UI patterns—keep consistent.
+
+---
+
+## State Management
+✅ Do
+- Use local state for UI-only state (drawer open, selected tab, etc.).
+- Use server-state tooling (React Query / SWR) if you adopt it.
+- If not, create a minimal API layer + caching strategy per feature.
+
+❌ Don’t
+- Don’t put server data in global stores by default.
+- Don’t duplicate state in multiple places (single source of truth).
+
+---
+
+## Data Fetching & API Client
+✅ Do
+- Centralize HTTP config:
+  - base URL
+  - auth header injection
+  - error normalization
+- Use typed request/response models.
+- Normalize errors into a consistent shape for UI.
+
+❌ Don’t
+- Don’t call `fetch` all over the codebase.
+- Don’t ignore non-200 responses.
+
+---
+
+## Forms & Validation
+✅ Do
+- Use a form library if forms are non-trivial (React Hook Form + Zod).
+- Validate before submit + show inline field errors.
+- Disable submit while loading to avoid double-submits.
+
+❌ Don’t
+- Don’t rely only on backend validation.
+- Don’t allow silent failures.
+
+---
+
+## Routing
+✅ Do
+- Protect routes with an auth guard component.
+- Lazy-load routes when appropriate.
+
+❌ Don’t
+- Don’t put auth logic deep inside pages—centralize route protection.
+
+---
+
+## UX & A11y
+✅ Do
+- Provide `loading`, `empty`, `error`, `success` feedback.
+- Use `toast` for transient events, inline errors for form validation.
+- Ensure focus states and keyboard navigation work.
+
+❌ Don’t
+- Don’t hide errors in console only.
+- Don’t use clickable divs without proper roles/handlers.
+
+---
+
+## Performance
+✅ Do
+- Avoid re-render cascades (split components, stable props).
+- Use suspense/lazy where helpful.
+- Debounce user-driven searches.
+
+❌ Don’t
+- Don’t prematurely optimize.
+- Don’t ship huge libraries without need.
+
+---
+
+## Testing (Frontend)
+✅ Do
+- Smoke test: app renders + main route loads.
+- Component tests for critical workflows.
+- Minimal e2e smoke if time.
+
+❌ Don’t
+- Don’t test implementation details (prefer user behavior).
+
+---
+
+## Security (Frontend)
+✅ Do
+- Treat frontend as untrusted; backend enforces authz.
+- Never store tokens in insecure places if avoidable (prefer provider SDK).
+
+❌ Don’t
+- Don’t expose secrets in Vite env (anything in `VITE_` is public).
+- Don’t assume hidden UI == protected action.
