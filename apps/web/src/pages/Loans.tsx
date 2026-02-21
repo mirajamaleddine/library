@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { listLoans, returnLoan } from "@/features/loans/api";
 import { type LoanOut } from "@/features/loans/types";
-import { useIsStaff } from "@/features/auth/useIsStaff";
+import { useCurrentUser } from "@/features/auth/useCurrentUser";
 import { cn } from "@/lib/cn";
 
 type StatusFilter = "all" | "borrowed" | "returned";
@@ -24,7 +24,9 @@ export function Loans() {
   const authedFetchRef = useRef(authedFetch);
   authedFetchRef.current = authedFetch;
 
-  const isStaff = useIsStaff();
+  const { permissions } = useCurrentUser();
+  const canManageLoans = permissions.includes("manage_loans");
+  const canViewAllLoans = permissions.includes("view_all_loans");
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [loans, setLoans] = useState<LoanOut[]>([]);
@@ -97,8 +99,8 @@ export function Loans() {
     }
   }
 
-  const pageTitle = isStaff ? "All Loans" : "My Loans";
-  const pageDescription = isStaff
+  const pageTitle = canViewAllLoans ? "All Loans" : "My Loans";
+  const pageDescription = canViewAllLoans
     ? "All active and returned loans."
     : "Books currently checked out to you.";
 
@@ -147,10 +149,10 @@ export function Loans() {
             <LoanCard
               key={loan.id}
               loan={loan}
-              isStaff={isStaff}
+              showBorrower={canViewAllLoans}
               returning={returningId === loan.id}
               onReturn={
-                isStaff && loan.status === "borrowed"
+                canManageLoans && loan.status === "borrowed"
                   ? () => void handleReturn(loan)
                   : undefined
               }
@@ -175,12 +177,12 @@ export function Loans() {
 
 function LoanCard({
   loan,
-  isStaff,
+  showBorrower,
   returning,
   onReturn,
 }: {
   loan: LoanOut;
-  isStaff: boolean;
+  showBorrower: boolean;
   returning: boolean;
   onReturn?: () => void;
 }) {
@@ -229,8 +231,7 @@ function LoanCard({
           )}
         </div>
 
-        {/* Staff see borrower info */}
-        {isStaff && (
+        {showBorrower && (
           <p className="text-xs text-muted-foreground truncate">
             <span className="font-medium">Borrower:</span>{" "}
             <span className="font-mono">{borrowerLabel}</span>

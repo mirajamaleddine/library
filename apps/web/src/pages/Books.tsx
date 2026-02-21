@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { createBook, deleteBook, listBooks } from "@/features/books/api";
 import { type BookCreate, type BookOut, type SortOption } from "@/features/books/types";
-import { useIsAdmin } from "@/features/auth/useIsAdmin";
+import { useCurrentUser } from "@/features/auth/useCurrentUser";
 import { cn } from "@/lib/cn";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -39,7 +39,8 @@ export function Books() {
   const authedFetchRef = useRef(authedFetch);
   authedFetchRef.current = authedFetch;
 
-  const isAdmin = useIsAdmin();
+  const { permissions } = useCurrentUser();
+  const canManageBooks = permissions.includes("manage_books");
 
   // ── Filter state ────────────────────────────────────────────────────────────
   const [searchInput, setSearchInput] = useState("");
@@ -168,7 +169,7 @@ export function Books() {
       </div>
 
       {/* Create form — admin only */}
-      {isAdmin && (
+      {canManageBooks && (
         <Card>
           <CardHeader>
             <CardTitle>Add a book</CardTitle>
@@ -313,7 +314,7 @@ export function Books() {
             <BookCard
               key={book.id}
               book={book}
-              isAdmin={isAdmin}
+              canManageBooks={canManageBooks}
               deleting={deletingId === book.id}
               onDelete={() => void handleDelete(book)}
             />
@@ -336,12 +337,12 @@ export function Books() {
 
 function BookCard({
   book,
-  isAdmin,
+  canManageBooks,
   deleting,
   onDelete,
 }: {
   book: BookOut;
-  isAdmin: boolean;
+  canManageBooks: boolean;
   deleting: boolean;
   onDelete: () => void;
 }) {
@@ -372,7 +373,7 @@ function BookCard({
           </Badge>
         </div>
       </CardContent>
-      {isAdmin && (
+      {canManageBooks && (
         <CardFooter className="pt-0">
           <Button
             variant="ghost"

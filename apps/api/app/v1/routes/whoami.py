@@ -1,32 +1,31 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, List
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.core.auth import require_auth
+from app.core.authorization import get_permissions
 
 router = APIRouter()
 
 
 class WhoamiResponse(BaseModel):
-    userId: Optional[str]
-    email: Optional[str]
-    # Sorted claim keys only — no raw values to avoid leaking sensitive data.
-    claimsKeys: list[str]
+    userId: str
+    permissions: List[str]
 
 
 @router.get("/whoami", response_model=WhoamiResponse)
 async def whoami(claims: dict[str, Any] = Depends(require_auth)) -> WhoamiResponse:
     """
-    Return the verified identity of the caller.
-    Requires a valid Clerk JWT in the Authorization header.
+    Return the verified identity and permissions of the caller.
+    Requires a valid Clerk JWT. Permissions are derived from the role in claims
+    (role is not exposed to the client).
     """
-    email: Optional[str] = claims.get("email") or claims.get("primary_email_address") or None
-
+    user_id = claims.get("sub") or ""
+    perms = get_permissions(claims)
     return WhoamiResponse(
-        userId=claims.get("sub"),
-        email=email,
-        claimsKeys=sorted(claims.keys()),
+        userId=user_id,
+        permissions=sorted(perms),
     )
