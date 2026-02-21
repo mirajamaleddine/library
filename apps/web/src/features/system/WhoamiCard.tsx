@@ -1,16 +1,18 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { useWhoami } from "./useWhoami";
+import { useCurrentUser } from "@/features/auth/useCurrentUser";
 
 export function WhoamiCard() {
-  const { state, refetch } = useWhoami();
+  const { state, userId, permissions, refetch } = useCurrentUser();
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Identity (whoami)</CardTitle>
-        <CardDescription>Claims returned by the backend for the current session.</CardDescription>
+        <CardDescription>
+          User and permissions returned by the backend for the current session.
+        </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -24,16 +26,22 @@ export function WhoamiCard() {
 
         {state.status === "success" && (
           <dl className="space-y-3 text-sm">
-            <Row label="User ID" value={state.data.userId ?? "—"} />
-            <Row label="Email" value={state.data.email ?? "—"} />
             <div>
-              <dt className="text-xs font-medium text-muted-foreground mb-1.5">Claim keys</dt>
+              <dt className="text-xs font-medium text-muted-foreground mb-0.5">User ID</dt>
+              <dd className="font-mono text-xs break-all">{userId ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground mb-1.5">Permissions</dt>
               <dd className="flex flex-wrap gap-1">
-                {state.data.claimsKeys.map((key) => (
-                  <Badge key={key} variant="secondary" className="font-mono text-xs">
-                    {key}
-                  </Badge>
-                ))}
+                {permissions.length === 0 ? (
+                  <span className="text-muted-foreground text-xs">None</span>
+                ) : (
+                  permissions.map((p) => (
+                    <Badge key={p} variant="secondary" className="font-mono text-xs">
+                      {p}
+                    </Badge>
+                  ))
+                )}
               </dd>
             </div>
           </dl>
@@ -51,14 +59,5 @@ export function WhoamiCard() {
         </Button>
       </CardFooter>
     </Card>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 font-mono text-xs break-all">{value}</dd>
-    </div>
   );
 }

@@ -20,7 +20,7 @@ import { checkoutBook, listLoans, returnLoan } from "@/features/loans/api";
 import { type LoanOut } from "@/features/loans/types";
 import { listUsers } from "@/features/users/api";
 import { type ClerkUser } from "@/features/users/types";
-import { useIsStaff } from "@/features/auth/useIsStaff";
+import { useCurrentUser } from "@/features/auth/useCurrentUser";
 import { cn } from "@/lib/cn";
 
 type BookState =
@@ -34,7 +34,8 @@ export function BookDetail() {
   const authedFetchRef = useRef(authedFetch);
   authedFetchRef.current = authedFetch;
 
-  const isStaff = useIsStaff();
+  const { permissions } = useCurrentUser();
+  const canManageLoans = permissions.includes("manage_loans");
   const [state, setState] = useState<BookState>({ status: "loading" });
   // Incrementing this triggers the ActiveLoansSection to re-fetch.
   const [loansKey, setLoansKey] = useState(0);
@@ -76,7 +77,7 @@ export function BookDetail() {
       {state.status === "success" && (
         <>
           <BookCard book={state.book} />
-          {isStaff && (
+          {canManageLoans && (
             <>
               <CheckoutSection book={state.book} onSuccess={handleLoanChange} />
               <ActiveLoansSection
