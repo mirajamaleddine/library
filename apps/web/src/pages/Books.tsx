@@ -10,15 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { createBook, deleteBook, listBooks } from "@/features/books/api";
-import { type BookCreate, type BookOut } from "@/features/books/types";
+import { type BookCreate, type BookOut, type SortOption } from "@/features/books/types";
 import { useIsAdmin } from "@/features/auth/useIsAdmin";
+import { cn } from "@/lib/cn";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-type ListState =
-  | { status: "loading" }
-  | { status: "success"; books: BookOut[] }
-  | { status: "error"; message: string };
 
 const EMPTY_FORM: BookCreate = {
   title: "",
@@ -30,6 +26,12 @@ const EMPTY_FORM: BookCreate = {
   coverImageUrl: "",
 };
 
+const SORT_LABELS: Record<SortOption, string> = {
+  "createdAt:desc": "Newest first",
+  "createdAt:asc": "Oldest first",
+  "title:asc": "Title A–Z",
+};
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function Books() {
@@ -39,44 +41,103 @@ export function Books() {
 
   const isAdmin = useIsAdmin();
 
-  const [listState, setListState] = useState<ListState>({ status: "loading" });
+  // ── Filter state ────────────────────────────────────────────────────────────
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [availableOnly, setAvailableOnly] = useState(false);
+  const [sort, setSort] = useState<SortOption>("createdAt:desc");
+
+  // ── List state ──────────────────────────────────────────────────────────────
+  const [books, setBooks] = useState<BookOut[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // ── Create form state ───────────────────────────────────────────────────────
   const [form, setForm] = useState<BookCreate>(EMPTY_FORM);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // ── Load books ──────────────────────────────────────────────────────────────
+  // ── Debounce search input ───────────────────────────────────────────────────
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchInput.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
-  async function loadBooks() {
-    setListState({ status: "loading" });
+  // ── Reload list when filters change ────────────────────────────────────────
+  useEffect(() => {
+    async function fetchFirst() {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await listBooks(authedFetchRef.current, {
+          query: debouncedQuery || undefined,
+          availableOnly,
+          sort,
+          limit: 20,
+        });
+        setBooks(result.items);
+        setNextCursor(result.nextCursor);
+      } catch (err) {
+        setError(err instanceof HttpError ? err.error.message : "Failed to load books.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    void fetchFirst();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery, availableOnly, sort]);
+
+  // ── Load more ───────────────────────────────────────────────────────────────
+  async function loadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
     try {
-      const books = await listBooks(authedFetchRef.current);
-      setListState({ status: "success", books });
-    } catch (err) {
-      setListState({
-        status: "error",
-        message: err instanceof HttpError ? err.error.message : "Failed to load books.",
+      const result = await listBooks(authedFetchRef.current, {
+        query: debouncedQuery || undefined,
+        availableOnly,
+        sort,
+        limit: 20,
+        cursor: nextCursor,
       });
+      setBooks((prev) => [...prev, ...result.items]);
+      setNextCursor(result.nextCursor);
+    } catch {
+      // silently ignore load-more failures
+    } finally {
+      setLoadingMore(false);
     }
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void loadBooks(); }, []);
-
   // ── Create ──────────────────────────────────────────────────────────────────
-
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setCreating(true);
     setCreateError(null);
     try {
-      await createBook(authedFetchRef.current, {
+      const created = await createBook(authedFetchRef.current, {
         ...form,
         publishedYear: form.publishedYear ?? undefined,
         coverImageUrl: form.coverImageUrl || undefined,
       });
       setForm(EMPTY_FORM);
-      await loadBooks();
+      // Optimistically prepend if on createdAt:desc, otherwise just reload.
+      if (sort === "createdAt:desc") {
+        setBooks((prev) => [created, ...prev]);
+      } else {
+        // Trigger a full reload by resetting the debounced query (no-op hack —
+        // easiest way is to force the effect by toggling a counter).
+        const result = await listBooks(authedFetchRef.current, {
+          query: debouncedQuery || undefined,
+          availableOnly,
+          sort,
+          limit: 20,
+        });
+        setBooks(result.items);
+        setNextCursor(result.nextCursor);
+      }
     } catch (err) {
       setCreateError(err instanceof HttpError ? err.error.message : "Failed to create book.");
     } finally {
@@ -85,13 +146,12 @@ export function Books() {
   }
 
   // ── Delete ──────────────────────────────────────────────────────────────────
-
   async function handleDelete(book: BookOut) {
     if (!window.confirm(`Delete "${book.title}"?`)) return;
     setDeletingId(book.id);
     try {
       await deleteBook(authedFetchRef.current, book.id);
-      await loadBooks();
+      setBooks((prev) => prev.filter((b) => b.id !== book.id));
     } catch (err) {
       alert(err instanceof HttpError ? err.error.message : "Failed to delete book.");
     } finally {
@@ -100,7 +160,6 @@ export function Books() {
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
-
   return (
     <div className="space-y-8">
       <div>
@@ -179,7 +238,6 @@ export function Books() {
                 </Field>
               </div>
 
-              {/* Cover image URL + live preview */}
               <Field label="Cover image URL">
                 <Input
                   type="url"
@@ -188,13 +246,9 @@ export function Books() {
                   placeholder="https://covers.openlibrary.org/b/id/123-L.jpg"
                 />
               </Field>
-              {form.coverImageUrl && (
-                <CoverPreview url={form.coverImageUrl} />
-              )}
+              {form.coverImageUrl && <CoverPreview url={form.coverImageUrl} />}
 
-              {createError && (
-                <p className="text-sm text-destructive">{createError}</p>
-              )}
+              {createError && <p className="text-sm text-destructive">{createError}</p>}
             </CardContent>
             <CardFooter>
               <Button type="submit" disabled={creating}>
@@ -205,24 +259,57 @@ export function Books() {
         </Card>
       )}
 
+      {/* ── Filter toolbar ───────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Input
+          className="h-9 w-full sm:w-64"
+          placeholder="Search title or author…"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+        />
+
+        <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border border-input accent-primary cursor-pointer"
+            checked={availableOnly}
+            onChange={(e) => setAvailableOnly(e.target.checked)}
+          />
+          Available only
+        </label>
+
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortOption)}
+          className={cn(
+            "h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm",
+            "focus:outline-none focus:ring-1 focus:ring-ring",
+          )}
+        >
+          {(Object.entries(SORT_LABELS) as [SortOption, string][]).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <Separator />
 
-      {/* Book list */}
-      {listState.status === "loading" && (
+      {/* ── Book list ────────────────────────────────────────────────────────── */}
+      {loading && (
         <p className="text-sm text-muted-foreground animate-pulse">Loading books…</p>
       )}
-
-      {listState.status === "error" && (
-        <p className="text-sm text-destructive">{listState.message}</p>
+      {!loading && error && (
+        <p className="text-sm text-destructive">{error}</p>
+      )}
+      {!loading && !error && books.length === 0 && (
+        <p className="text-sm text-muted-foreground">No books found.</p>
       )}
 
-      {listState.status === "success" && listState.books.length === 0 && (
-        <p className="text-sm text-muted-foreground">No books yet.</p>
-      )}
-
-      {listState.status === "success" && listState.books.length > 0 && (
+      {books.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {listState.books.map((book) => (
+          {books.map((book) => (
             <BookCard
               key={book.id}
               book={book}
@@ -231,6 +318,14 @@ export function Books() {
               onDelete={() => void handleDelete(book)}
             />
           ))}
+        </div>
+      )}
+
+      {nextCursor && (
+        <div className="flex justify-center pt-2">
+          <Button variant="outline" onClick={() => void loadMore()} disabled={loadingMore}>
+            {loadingMore ? "Loading…" : "Load more"}
+          </Button>
         </div>
       )}
     </div>
@@ -294,12 +389,10 @@ function BookCard({
   );
 }
 
-// ── Shared image helpers ──────────────────────────────────────────────────────
+// ── Image helpers ─────────────────────────────────────────────────────────────
 
-/** Small thumbnail for list cards. */
 function BookThumbnail({ url }: { url: string | null }) {
   const [broken, setBroken] = useState(false);
-
   if (!url || broken) {
     return (
       <div className="h-16 w-12 shrink-0 rounded bg-muted flex items-center justify-center">
@@ -309,7 +402,6 @@ function BookThumbnail({ url }: { url: string | null }) {
       </div>
     );
   }
-
   return (
     <img
       src={url}
@@ -320,23 +412,16 @@ function BookThumbnail({ url }: { url: string | null }) {
   );
 }
 
-/** Live preview shown while typing in the create form. */
 function CoverPreview({ url }: { url: string }) {
   const [broken, setBroken] = useState(false);
-
-  // Reset broken state whenever the URL changes.
   const prevUrl = useRef(url);
   if (prevUrl.current !== url) {
     prevUrl.current = url;
     setBroken(false);
   }
-
   if (broken) {
-    return (
-      <p className="text-xs text-muted-foreground">Image failed to load — check the URL.</p>
-    );
+    return <p className="text-xs text-muted-foreground">Image failed to load — check the URL.</p>;
   }
-
   return (
     <img
       src={url}

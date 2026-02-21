@@ -13,3 +13,8 @@ export interface LoanOut {
 export interface LoanCreate {
   bookId: string;
 }
+
+export interface LoanListResponse {
+  items: LoanOut[];
+  nextCursor: string | null;
+}

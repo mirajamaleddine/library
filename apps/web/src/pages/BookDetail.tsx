@@ -39,12 +39,12 @@ export function BookDetail() {
     setBorrowState("checking");
     try {
       // Fetch book details and active loans for this book in parallel.
-      const [book, myLoansForBook] = await Promise.all([
+      const [book, loansResult] = await Promise.all([
         getBook(authedFetchRef.current, id),
-        listMyLoans(authedFetchRef.current, false, id),
+        listMyLoans(authedFetchRef.current, { bookId: id }),
       ]);
       setState({ status: "success", book });
-      const hasActiveLoan = myLoansForBook.some((l) => l.status === "borrowed");
+      const hasActiveLoan = loansResult.items.some((l) => l.status === "borrowed");
       setBorrowState(hasActiveLoan ? "already_borrowed" : "idle");
     } catch (err) {
       setState({

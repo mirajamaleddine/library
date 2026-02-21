@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.domain.models import Loan
 from app.lib.errors import ApiException
+from app.lib.pagination import decode_cursor, encode_cursor
 from app.repos import books_repo, loans_repo
 
 
@@ -32,7 +33,6 @@ def borrow_book(db: Session, borrower_id: str, book_id: uuid.UUID) -> Loan:
             status_code=404,
         )
 
-    # One-active-loan-per-book constraint (app layer; DB has a partial unique index too).
     if loans_repo.find_active_loan_for_book(db, borrower_id, book_id):
         raise ApiException(
             code="ALREADY_BORROWED",
@@ -99,15 +99,31 @@ def return_loan(
 def list_loans(
     db: Session,
     borrower_id: str,
+    *,
     all_loans: bool = False,
     book_id: Optional[uuid.UUID] = None,
-    skip: int = 0,
-    limit: int = 50,
-) -> List[Loan]:
-    return loans_repo.list_loans(
+    status: Optional[str] = None,
+    limit: int = 20,
+    cursor: Optional[str] = None,
+) -> Tuple[List[Loan], Optional[str]]:
+    cursor_data = decode_cursor(cursor) if cursor else None
+
+    rows = loans_repo.list_paginated(
         db,
         borrower_id=None if all_loans else borrower_id,
         book_id=book_id,
-        skip=skip,
-        limit=limit,
+        status=status,
+        limit=limit + 1,
+        cursor_data=cursor_data,
     )
+
+    has_more = len(rows) > limit
+    if has_more:
+        rows = rows[:limit]
+
+    next_cursor: Optional[str] = None
+    if has_more and rows:
+        last = rows[-1]
+        next_cursor = encode_cursor({"ts": last.borrowed_at.isoformat(), "id": str(last.id)})
+
+    return rows, next_cursor

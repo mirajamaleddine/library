@@ -20,3 +20,10 @@ export interface BookCreate {
   availableCopies?: number;
   coverImageUrl?: string;
 }
+
+export interface BookListResponse {
+  items: BookOut[];
+  nextCursor: string | null;
+}
+
+export type SortOption = "createdAt:desc" | "createdAt:asc" | "title:asc";

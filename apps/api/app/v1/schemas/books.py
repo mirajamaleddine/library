@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, HttpUrl
 from pydantic.alias_generators import to_camel
@@ -43,7 +43,6 @@ class BookCreate(BaseModel):
         if not v:
             return None
         v = str(v).strip()
-        # Delegate to pydantic's HttpUrl for validation
         HttpUrl(v)
         return v
 
@@ -67,3 +66,15 @@ class BookOut(BaseModel):
     cover_image_url: Optional[str]
     created_at: datetime
     updated_at: datetime
+
+
+class BookListOut(BaseModel):
+    """Paginated list response for GET /v1/books."""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    items: List[BookOut]
+    next_cursor: Optional[str] = None

@@ -9,11 +9,15 @@ import { Separator } from "@/components/ui/separator";
 import { listMyLoans, returnLoan } from "@/features/loans/api";
 import { type LoanOut } from "@/features/loans/types";
 import { useIsAdmin } from "@/features/auth/useIsAdmin";
+import { cn } from "@/lib/cn";
 
-type ListState =
-  | { status: "loading" }
-  | { status: "success"; loans: LoanOut[] }
-  | { status: "error"; message: string };
+type StatusFilter = "all" | "borrowed" | "returned";
+
+const STATUS_LABELS: Record<StatusFilter, string> = {
+  all: "All",
+  borrowed: "Borrowed",
+  returned: "Returned",
+};
 
 export function Loans() {
   const authedFetch = useAuthedFetch();
@@ -21,32 +25,78 @@ export function Loans() {
   authedFetchRef.current = authedFetch;
 
   const isAdmin = useIsAdmin();
+
+  // ── Filter state ────────────────────────────────────────────────────────────
   const [showAll, setShowAll] = useState(false);
-  const [listState, setListState] = useState<ListState>({ status: "loading" });
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  // ── List state ──────────────────────────────────────────────────────────────
+  const [loans, setLoans] = useState<LoanOut[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [returningId, setReturningId] = useState<string | null>(null);
 
-  async function load(all: boolean) {
-    setListState({ status: "loading" });
+  // ── Load first page ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    async function fetchFirst() {
+      setLoading(true);
+      setError(null);
+      setLoans([]);
+      setNextCursor(null);
+      try {
+        const result = await listMyLoans(authedFetchRef.current, {
+          showAll,
+          status: statusFilter === "all" ? undefined : statusFilter,
+          limit: 20,
+        });
+        setLoans(result.items);
+        setNextCursor(result.nextCursor);
+      } catch (err) {
+        setError(err instanceof HttpError ? err.error.message : "Failed to load loans.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    void fetchFirst();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAll, statusFilter]);
+
+  // ── Load more ───────────────────────────────────────────────────────────────
+  async function loadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
     try {
-      const loans = await listMyLoans(authedFetchRef.current, all);
-      setListState({ status: "success", loans });
-    } catch (err) {
-      setListState({
-        status: "error",
-        message: err instanceof HttpError ? err.error.message : "Failed to load loans.",
+      const result = await listMyLoans(authedFetchRef.current, {
+        showAll,
+        status: statusFilter === "all" ? undefined : statusFilter,
+        limit: 20,
+        cursor: nextCursor,
       });
+      setLoans((prev) => [...prev, ...result.items]);
+      setNextCursor(result.nextCursor);
+    } catch {
+      // silently ignore
+    } finally {
+      setLoadingMore(false);
     }
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void load(showAll); }, [showAll]);
-
+  // ── Return a loan ───────────────────────────────────────────────────────────
   async function handleReturn(loan: LoanOut) {
     if (!window.confirm(`Return "${loan.bookTitle}"?`)) return;
     setReturningId(loan.id);
     try {
       await returnLoan(authedFetchRef.current, loan.id);
-      await load(showAll);
+      // Reload page 1 so available_copies reflect correctly.
+      const result = await listMyLoans(authedFetchRef.current, {
+        showAll,
+        status: statusFilter === "all" ? undefined : statusFilter,
+        limit: 20,
+      });
+      setLoans(result.items);
+      setNextCursor(result.nextCursor);
     } catch (err) {
       alert(err instanceof HttpError ? err.error.message : "Failed to return loan.");
     } finally {
@@ -54,17 +104,9 @@ export function Loans() {
     }
   }
 
-  const activeLoans =
-    listState.status === "success"
-      ? listState.loans.filter((l) => l.status === "borrowed")
-      : [];
-  const returnedLoans =
-    listState.status === "success"
-      ? listState.loans.filter((l) => l.status === "returned")
-      : [];
-
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -72,85 +114,64 @@ export function Loans() {
           <p className="mt-1 text-muted-foreground">Books you have borrowed.</p>
         </div>
         {isAdmin && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAll((v) => !v)}
-          >
+          <Button variant="outline" size="sm" onClick={() => setShowAll((v) => !v)}>
             {showAll ? "Show my loans" : "Show all loans"}
           </Button>
         )}
       </div>
 
-      {listState.status === "loading" && (
+      {/* Status filter buttons */}
+      <div className="flex gap-1.5">
+        {(Object.entries(STATUS_LABELS) as [StatusFilter, string][]).map(([value, label]) => (
+          <button
+            key={value}
+            onClick={() => setStatusFilter(value)}
+            className={cn(
+              "rounded-full px-3 py-1 text-sm font-medium transition-colors",
+              statusFilter === value
+                ? "bg-foreground text-background"
+                : "bg-muted text-muted-foreground hover:bg-muted/70",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <Separator />
+
+      {/* List */}
+      {loading && (
         <p className="text-sm text-muted-foreground animate-pulse">Loading…</p>
       )}
-      {listState.status === "error" && (
-        <p className="text-sm text-destructive">{listState.message}</p>
+      {!loading && error && (
+        <p className="text-sm text-destructive">{error}</p>
+      )}
+      {!loading && !error && loans.length === 0 && (
+        <p className="text-sm text-muted-foreground">No loans found.</p>
       )}
 
-      {listState.status === "success" && (
-        <>
-          {/* Active loans */}
-          <section className="space-y-4">
-            <h2 className="text-lg font-semibold">
-              Active{" "}
-              {activeLoans.length > 0 && (
-                <Badge variant="secondary" className="ml-1 text-xs font-normal">
-                  {activeLoans.length}
-                </Badge>
-              )}
-            </h2>
+      {loans.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {loans.map((loan) => (
+            <LoanCard
+              key={loan.id}
+              loan={loan}
+              showBorrower={showAll}
+              returning={returningId === loan.id}
+              onReturn={loan.status === "borrowed" ? () => void handleReturn(loan) : undefined}
+            />
+          ))}
+        </div>
+      )}
 
-            {activeLoans.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No active loans.</p>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {activeLoans.map((loan) => (
-                  <LoanCard
-                    key={loan.id}
-                    loan={loan}
-                    showBorrower={showAll}
-                    action={
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={returningId === loan.id}
-                        onClick={() => void handleReturn(loan)}
-                      >
-                        {returningId === loan.id ? "Returning…" : "Return"}
-                      </Button>
-                    }
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
-          <Separator />
-
-          {/* Returned loans */}
-          <section className="space-y-4">
-            <h2 className="text-lg font-semibold text-muted-foreground">
-              Returned{" "}
-              {returnedLoans.length > 0 && (
-                <Badge variant="outline" className="ml-1 text-xs font-normal">
-                  {returnedLoans.length}
-                </Badge>
-              )}
-            </h2>
-
-            {returnedLoans.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No returned loans yet.</p>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {returnedLoans.map((loan) => (
-                  <LoanCard key={loan.id} loan={loan} showBorrower={showAll} />
-                ))}
-              </div>
-            )}
-          </section>
-        </>
+      {/* Load more */}
+      {nextCursor && (
+        <div className="flex justify-center pt-2">
+          <Button variant="outline" onClick={() => void loadMore()} disabled={loadingMore}>
+            {loadingMore ? "Loading…" : "Load more"}
+          </Button>
+        </div>
       )}
     </div>
   );
@@ -161,11 +182,13 @@ export function Loans() {
 function LoanCard({
   loan,
   showBorrower,
-  action,
+  returning,
+  onReturn,
 }: {
   loan: LoanOut;
   showBorrower: boolean;
-  action?: React.ReactNode;
+  returning: boolean;
+  onReturn?: () => void;
 }) {
   const [imgBroken, setImgBroken] = useState(false);
 
@@ -173,7 +196,6 @@ function LoanCard({
     <Card>
       <CardHeader className="pb-3">
         <div className="flex gap-3">
-          {/* Cover thumbnail */}
           {loan.bookCoverImageUrl && !imgBroken ? (
             <img
               src={loan.bookCoverImageUrl}
@@ -212,10 +234,17 @@ function LoanCard({
           <p className="text-xs font-mono text-muted-foreground truncate">{loan.borrowerId}</p>
         )}
         <div className="flex items-center justify-between gap-2 pt-1">
-          <Badge variant={loan.status === "borrowed" ? "default" : "secondary"} className="text-xs">
+          <Badge
+            variant={loan.status === "borrowed" ? "default" : "secondary"}
+            className="text-xs"
+          >
             {loan.status}
           </Badge>
-          {action}
+          {onReturn && (
+            <Button size="sm" variant="outline" disabled={returning} onClick={onReturn}>
+              {returning ? "Returning…" : "Return"}
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
