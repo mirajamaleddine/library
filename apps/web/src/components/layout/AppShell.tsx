@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 
 const NAV_LINKS = [
   { to: "/", label: "Home", end: true },
+  { to: "/books", label: "Books", end: false },
   { to: "/dashboard", label: "Dashboard", end: false },
 ] as const;
 

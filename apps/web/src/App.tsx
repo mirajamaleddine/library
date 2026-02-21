@@ -2,6 +2,8 @@ import { SignIn, SignUp, SignedIn, SignedOut } from "@clerk/clerk-react";
 import { type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
+import { BookDetail } from "@/pages/BookDetail";
+import { Books } from "@/pages/Books";
 import { Dashboard } from "@/pages/Dashboard";
 import { Home } from "@/pages/Home";
 
@@ -21,7 +23,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Clerk auth pages — rendered outside the app shell */}
+        {/* Clerk auth pages — outside the app shell */}
         <Route
           path="/sign-in/*"
           element={
@@ -42,6 +44,22 @@ export default function App() {
         {/* App shell routes */}
         <Route element={<AppShell />}>
           <Route path="/" element={<Home />} />
+          <Route
+            path="/books"
+            element={
+              <ProtectedRoute>
+                <Books />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/books/:id"
+            element={
+              <ProtectedRoute>
+                <BookDetail />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/dashboard"
             element={

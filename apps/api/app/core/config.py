@@ -7,12 +7,18 @@ class Settings(BaseSettings):
     ENV: str = "dev"
     PORT: int = 8000
     CORS_ORIGINS: str = "http://localhost:5173"
-    DATABASE_URL: str = "postgresql://postgres:qTUZXEZlKeGmQpVo@db.oltnufekaodccovvdglo.supabase.co:5432/postgres"
+    DATABASE_URL: str = "postgresql+psycopg://user:pass@localhost:5432/library"
 
     # Clerk JWT verification
-    CLERK_JWKS_URL: str = "https://legible-horse-99.clerk.accounts.dev/.well-known/jwks.json"
-    CLERK_ISSUER: str = "https://legible-horse-99.clerk.accounts.dev"
-    CLERK_AUDIENCE: str = ""  # usually empty for Clerk; set if required
+    CLERK_JWKS_URL: str = ""
+    CLERK_ISSUER: str = ""
+    CLERK_AUDIENCE: str = ""
+
+    # Admin role claim — checked on every write operation.
+    # Set ADMIN_ROLE_CLAIM_KEY to the JWT claim that carries the role value (e.g. "role").
+    # Set ADMIN_ROLE_VALUE to the value that identifies an admin (e.g. "admin").
+    ADMIN_ROLE_CLAIM_KEY: str = "role"
+    ADMIN_ROLE_VALUE: str = "admin"
 
     model_config = SettingsConfigDict(
         env_file=".env",

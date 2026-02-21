@@ -19,8 +19,8 @@ export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
 
   try {
     response = await fetch(url, {
-      headers: { "Content-Type": "application/json", ...init?.headers },
       ...init,
+      headers: { "Content-Type": "application/json", ...init?.headers },
     });
   } catch (cause) {
     throw new HttpError(0, {
@@ -45,6 +45,11 @@ export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
       };
     }
     throw new HttpError(response.status, error);
+  }
+
+  // 204 No Content (e.g. DELETE) has no body to parse.
+  if (response.status === 204 || response.headers.get("content-length") === "0") {
+    return undefined as T;
   }
 
   return response.json() as Promise<T>;

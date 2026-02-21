@@ -19,6 +19,7 @@ from typing import Any, Dict, Optional
 
 import httpx
 import jwt
+from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.algorithms import RSAAlgorithm
 
@@ -118,7 +119,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 async def require_auth(
-    credentials: Optional[HTTPAuthorizationCredentials] = _bearer,  # type: ignore[assignment]
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
 ) -> Dict[str, Any]:
     """
     FastAPI dependency for protected endpoints.
