@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, HttpUrl
 from pydantic.alias_generators import to_camel
 
 
@@ -20,6 +20,7 @@ class BookCreate(BaseModel):
     isbn: Optional[str] = None
     publishedYear: Optional[int] = Field(default=None)
     availableCopies: int = Field(default=1)
+    coverImageUrl: Optional[str] = Field(default=None)
 
     @field_validator("title", "author", mode="before")
     @classmethod
@@ -35,6 +36,16 @@ class BookCreate(BaseModel):
         if int(v) < 0:
             raise ValueError("must be >= 0")
         return int(v)
+
+    @field_validator("coverImageUrl", mode="before")
+    @classmethod
+    def validate_url(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return None
+        v = str(v).strip()
+        # Delegate to pydantic's HttpUrl for validation
+        HttpUrl(v)
+        return v
 
 
 class BookOut(BaseModel):
@@ -53,5 +64,6 @@ class BookOut(BaseModel):
     isbn: Optional[str]
     published_year: Optional[int]
     available_copies: int
+    cover_image_url: Optional[str]
     created_at: datetime
     updated_at: datetime

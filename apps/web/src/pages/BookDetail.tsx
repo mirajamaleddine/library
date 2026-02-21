@@ -59,8 +59,15 @@ function BookCard({ book }: { book: BookOut }) {
   return (
     <Card className="max-w-2xl">
       <CardHeader>
-        <CardTitle className="text-2xl">{book.title}</CardTitle>
-        <p className="text-muted-foreground">{book.author}</p>
+        <div className="flex gap-5 items-start">
+          {book.coverImageUrl && (
+            <CoverImage url={book.coverImageUrl} title={book.title} />
+          )}
+          <div>
+            <CardTitle className="text-2xl">{book.title}</CardTitle>
+            <p className="text-muted-foreground mt-1">{book.author}</p>
+          </div>
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-5">
@@ -90,6 +97,21 @@ function BookCard({ book }: { book: BookOut }) {
         </dl>
       </CardContent>
     </Card>
+  );
+}
+
+function CoverImage({ url, title }: { url: string; title: string }) {
+  const [broken, setBroken] = useState(false);
+
+  if (broken) return null;
+
+  return (
+    <img
+      src={url}
+      alt={`Cover of ${title}`}
+      className="max-w-[120px] rounded-md shadow object-cover border border-border shrink-0"
+      onError={() => setBroken(true)}
+    />
   );
 }
 

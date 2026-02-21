@@ -6,6 +6,7 @@ export interface BookOut {
   isbn: string | null;
   publishedYear: number | null;
   availableCopies: number;
+  coverImageUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -17,4 +18,5 @@ export interface BookCreate {
   isbn?: string;
   publishedYear?: number;
   availableCopies?: number;
+  coverImageUrl?: string;
 }

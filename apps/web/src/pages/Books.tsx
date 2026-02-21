@@ -27,6 +27,7 @@ const EMPTY_FORM: BookCreate = {
   isbn: "",
   publishedYear: undefined,
   availableCopies: 1,
+  coverImageUrl: "",
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -72,6 +73,7 @@ export function Books() {
       await createBook(authedFetchRef.current, {
         ...form,
         publishedYear: form.publishedYear ?? undefined,
+        coverImageUrl: form.coverImageUrl || undefined,
       });
       setForm(EMPTY_FORM);
       await loadBooks();
@@ -177,6 +179,19 @@ export function Books() {
                 </Field>
               </div>
 
+              {/* Cover image URL + live preview */}
+              <Field label="Cover image URL">
+                <Input
+                  type="url"
+                  value={form.coverImageUrl ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, coverImageUrl: e.target.value }))}
+                  placeholder="https://covers.openlibrary.org/b/id/123-L.jpg"
+                />
+              </Field>
+              {form.coverImageUrl && (
+                <CoverPreview url={form.coverImageUrl} />
+              )}
+
               {createError && (
                 <p className="text-sm text-destructive">{createError}</p>
               )}
@@ -208,47 +223,13 @@ export function Books() {
       {listState.status === "success" && listState.books.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {listState.books.map((book) => (
-            <Card key={book.id} className="flex flex-col">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base leading-snug">
-                  <Link
-                    to={`/books/${book.id}`}
-                    className="hover:underline underline-offset-2"
-                  >
-                    {book.title}
-                  </Link>
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">{book.author}</p>
-              </CardHeader>
-              <CardContent className="flex-1 pb-2">
-                <div className="flex flex-wrap gap-1">
-                  {book.publishedYear && (
-                    <Badge variant="outline" className="text-xs">
-                      {book.publishedYear}
-                    </Badge>
-                  )}
-                  <Badge
-                    variant={book.availableCopies > 0 ? "success" : "secondary"}
-                    className="text-xs"
-                  >
-                    {book.availableCopies} available
-                  </Badge>
-                </div>
-              </CardContent>
-              {isAdmin && (
-                <CardFooter className="pt-0">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    disabled={deletingId === book.id}
-                    onClick={() => void handleDelete(book)}
-                  >
-                    {deletingId === book.id ? "Deleting…" : "Delete"}
-                  </Button>
-                </CardFooter>
-              )}
-            </Card>
+            <BookCard
+              key={book.id}
+              book={book}
+              isAdmin={isAdmin}
+              deleting={deletingId === book.id}
+              onDelete={() => void handleDelete(book)}
+            />
           ))}
         </div>
       )}
@@ -256,7 +237,117 @@ export function Books() {
   );
 }
 
-// ── Small helpers ─────────────────────────────────────────────────────────────
+// ── Book card ─────────────────────────────────────────────────────────────────
+
+function BookCard({
+  book,
+  isAdmin,
+  deleting,
+  onDelete,
+}: {
+  book: BookOut;
+  isAdmin: boolean;
+  deleting: boolean;
+  onDelete: () => void;
+}) {
+  return (
+    <Card className="flex flex-col">
+      <CardHeader className="pb-2">
+        <div className="flex gap-3">
+          <BookThumbnail url={book.coverImageUrl} />
+          <div className="min-w-0">
+            <CardTitle className="text-base leading-snug">
+              <Link to={`/books/${book.id}`} className="hover:underline underline-offset-2">
+                {book.title}
+              </Link>
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-0.5 truncate">{book.author}</p>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="flex-1 pb-2">
+        <div className="flex flex-wrap gap-1">
+          {book.publishedYear && (
+            <Badge variant="outline" className="text-xs">
+              {book.publishedYear}
+            </Badge>
+          )}
+          <Badge variant={book.availableCopies > 0 ? "success" : "secondary"} className="text-xs">
+            {book.availableCopies} available
+          </Badge>
+        </div>
+      </CardContent>
+      {isAdmin && (
+        <CardFooter className="pt-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            disabled={deleting}
+            onClick={onDelete}
+          >
+            {deleting ? "Deleting…" : "Delete"}
+          </Button>
+        </CardFooter>
+      )}
+    </Card>
+  );
+}
+
+// ── Shared image helpers ──────────────────────────────────────────────────────
+
+/** Small thumbnail for list cards. */
+function BookThumbnail({ url }: { url: string | null }) {
+  const [broken, setBroken] = useState(false);
+
+  if (!url || broken) {
+    return (
+      <div className="h-16 w-12 shrink-0 rounded bg-muted flex items-center justify-center">
+        <span className="text-[9px] text-muted-foreground text-center leading-tight px-1">
+          No Cover
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={url}
+      alt="cover"
+      className="h-16 w-12 shrink-0 rounded object-cover border border-border"
+      onError={() => setBroken(true)}
+    />
+  );
+}
+
+/** Live preview shown while typing in the create form. */
+function CoverPreview({ url }: { url: string }) {
+  const [broken, setBroken] = useState(false);
+
+  // Reset broken state whenever the URL changes.
+  const prevUrl = useRef(url);
+  if (prevUrl.current !== url) {
+    prevUrl.current = url;
+    setBroken(false);
+  }
+
+  if (broken) {
+    return (
+      <p className="text-xs text-muted-foreground">Image failed to load — check the URL.</p>
+    );
+  }
+
+  return (
+    <img
+      src={url}
+      alt="cover preview"
+      className="max-h-40 rounded-md shadow-sm border border-border object-cover"
+      onError={() => setBroken(true)}
+    />
+  );
+}
+
+// ── Field wrapper ─────────────────────────────────────────────────────────────
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

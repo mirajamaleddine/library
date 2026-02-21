@@ -22,6 +22,7 @@ class Book(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     isbn: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     published_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    cover_image_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     available_copies: Mapped[int] = mapped_column(
         Integer, nullable=False, default=1, server_default="1"
     )

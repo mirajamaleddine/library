@@ -18,6 +18,7 @@ def create_book(db: Session, data: BookCreate) -> Book:
         "isbn": data.isbn,
         "published_year": data.publishedYear,
         "available_copies": data.availableCopies,
+        "cover_image_url": data.coverImageUrl or None,
     }
     return books_repo.create(db, book_data)
 
