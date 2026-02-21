@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.auth import require_auth
+from app.core.authorization import Permissions, has_permission
 from app.core.db import get_db
-from app.core.permissions import is_admin
 from app.services import loans_service
 from app.v1.schemas.loans import LoanCreate, LoanListOut, LoanOut
 
@@ -40,7 +40,7 @@ async def list_loans(
     loans, next_cursor = loans_service.list_loans(
         db,
         borrower_id=claims["sub"],
-        all_loans=show_all and is_admin(claims),
+        all_loans=show_all and has_permission(claims, Permissions.VIEW_ALL_LOANS),
         book_id=book_id,
         status=status,
         limit=limit,
@@ -62,6 +62,6 @@ async def return_loan(
         db,
         borrower_id=claims["sub"],
         loan_id=loan_id,
-        is_admin_user=is_admin(claims),
+        is_admin_user=has_permission(claims, Permissions.MANAGE_LOANS),
     )
     return LoanOut.model_validate(loan)

@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.auth import require_auth
+from app.core.authorization import Permissions, require_permission
 from app.core.db import get_db
-from app.core.permissions import require_admin
 from app.lib.errors import ApiException
 from app.services import books_service
 from app.v1.schemas.books import BookCreate, BookListOut, BookOut
@@ -68,7 +68,7 @@ async def get_book(
 async def create_book(
     data: BookCreate,
     db: Session = Depends(get_db),
-    _claims: Dict[str, Any] = Depends(require_admin),
+    _claims: Dict[str, Any] = Depends(require_permission(Permissions.MANAGE_BOOKS)),
 ) -> BookOut:
     book = books_service.create_book(db, data)
     return BookOut.model_validate(book)
@@ -78,7 +78,7 @@ async def create_book(
 async def delete_book(
     book_id: uuid.UUID,
     db: Session = Depends(get_db),
-    _claims: Dict[str, Any] = Depends(require_admin),
+    _claims: Dict[str, Any] = Depends(require_permission(Permissions.MANAGE_BOOKS)),
 ) -> Response:
     deleted = books_service.delete_book(db, book_id)
     if not deleted:
