@@ -1,7 +1,9 @@
 export interface LoanOut {
   id: string;
   bookId: string;
-  borrowerId: string;
+  borrowerUserId: string | null;
+  borrowerName: string | null;
+  processedByAdminId: string;
   status: "borrowed" | "returned";
   borrowedAt: string;
   returnedAt: string | null;
@@ -12,6 +14,8 @@ export interface LoanOut {
 
 export interface LoanCreate {
   bookId: string;
+  borrowerUserId?: string;
+  borrowerName?: string;
 }
 
 export interface LoanListResponse {

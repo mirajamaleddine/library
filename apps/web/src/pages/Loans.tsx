@@ -6,16 +6,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { listMyLoans, returnLoan } from "@/features/loans/api";
+import { listLoans, returnLoan } from "@/features/loans/api";
 import { type LoanOut } from "@/features/loans/types";
-import { useIsAdmin } from "@/features/auth/useIsAdmin";
+import { useIsStaff } from "@/features/auth/useIsStaff";
 import { cn } from "@/lib/cn";
 
 type StatusFilter = "all" | "borrowed" | "returned";
 
 const STATUS_LABELS: Record<StatusFilter, string> = {
   all: "All",
-  borrowed: "Borrowed",
+  borrowed: "Checked Out",
   returned: "Returned",
 };
 
@@ -24,13 +24,9 @@ export function Loans() {
   const authedFetchRef = useRef(authedFetch);
   authedFetchRef.current = authedFetch;
 
-  const isAdmin = useIsAdmin();
+  const isStaff = useIsStaff();
 
-  // ── Filter state ────────────────────────────────────────────────────────────
-  const [showAll, setShowAll] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-
-  // ── List state ──────────────────────────────────────────────────────────────
   const [loans, setLoans] = useState<LoanOut[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,8 +42,7 @@ export function Loans() {
       setLoans([]);
       setNextCursor(null);
       try {
-        const result = await listMyLoans(authedFetchRef.current, {
-          showAll,
+        const result = await listLoans(authedFetchRef.current, {
           status: statusFilter === "all" ? undefined : statusFilter,
           limit: 20,
         });
@@ -61,15 +56,14 @@ export function Loans() {
     }
     void fetchFirst();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showAll, statusFilter]);
+  }, [statusFilter]);
 
   // ── Load more ───────────────────────────────────────────────────────────────
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const result = await listMyLoans(authedFetchRef.current, {
-        showAll,
+      const result = await listLoans(authedFetchRef.current, {
         status: statusFilter === "all" ? undefined : statusFilter,
         limit: 20,
         cursor: nextCursor,
@@ -83,15 +77,14 @@ export function Loans() {
     }
   }
 
-  // ── Return a loan ───────────────────────────────────────────────────────────
+  // ── Return a loan (staff only) ───────────────────────────────────────────────
   async function handleReturn(loan: LoanOut) {
     if (!window.confirm(`Return "${loan.bookTitle}"?`)) return;
     setReturningId(loan.id);
     try {
       await returnLoan(authedFetchRef.current, loan.id);
       // Reload page 1 so available_copies reflect correctly.
-      const result = await listMyLoans(authedFetchRef.current, {
-        showAll,
+      const result = await listLoans(authedFetchRef.current, {
         status: statusFilter === "all" ? undefined : statusFilter,
         limit: 20,
       });
@@ -104,20 +97,17 @@ export function Loans() {
     }
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  const pageTitle = isStaff ? "All Loans" : "My Loans";
+  const pageDescription = isStaff
+    ? "All active and returned loans."
+    : "Books currently checked out to you.";
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">My Loans</h1>
-          <p className="mt-1 text-muted-foreground">Books you have borrowed.</p>
-        </div>
-        {isAdmin && (
-          <Button variant="outline" size="sm" onClick={() => setShowAll((v) => !v)}>
-            {showAll ? "Show my loans" : "Show all loans"}
-          </Button>
-        )}
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">{pageTitle}</h1>
+        <p className="mt-1 text-muted-foreground">{pageDescription}</p>
       </div>
 
       {/* Status filter buttons */}
@@ -157,9 +147,13 @@ export function Loans() {
             <LoanCard
               key={loan.id}
               loan={loan}
-              showBorrower={showAll}
+              isStaff={isStaff}
               returning={returningId === loan.id}
-              onReturn={loan.status === "borrowed" ? () => void handleReturn(loan) : undefined}
+              onReturn={
+                isStaff && loan.status === "borrowed"
+                  ? () => void handleReturn(loan)
+                  : undefined
+              }
             />
           ))}
         </div>
@@ -181,16 +175,20 @@ export function Loans() {
 
 function LoanCard({
   loan,
-  showBorrower,
+  isStaff,
   returning,
   onReturn,
 }: {
   loan: LoanOut;
-  showBorrower: boolean;
+  isStaff: boolean;
   returning: boolean;
   onReturn?: () => void;
 }) {
   const [imgBroken, setImgBroken] = useState(false);
+
+  const borrowerLabel = loan.borrowerUserId
+    ? loan.borrowerUserId
+    : (loan.borrowerName ?? "—");
 
   return (
     <Card>
@@ -225,24 +223,30 @@ function LoanCard({
       </CardHeader>
       <CardContent className="pt-0 space-y-2">
         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-          <span>Borrowed {new Date(loan.borrowedAt).toLocaleDateString()}</span>
+          <span>Checked out {new Date(loan.borrowedAt).toLocaleDateString()}</span>
           {loan.returnedAt && (
             <span>· Returned {new Date(loan.returnedAt).toLocaleDateString()}</span>
           )}
         </div>
-        {showBorrower && (
-          <p className="text-xs font-mono text-muted-foreground truncate">{loan.borrowerId}</p>
+
+        {/* Staff see borrower info */}
+        {isStaff && (
+          <p className="text-xs text-muted-foreground truncate">
+            <span className="font-medium">Borrower:</span>{" "}
+            <span className="font-mono">{borrowerLabel}</span>
+          </p>
         )}
+
         <div className="flex items-center justify-between gap-2 pt-1">
           <Badge
             variant={loan.status === "borrowed" ? "default" : "secondary"}
             className="text-xs"
           >
-            {loan.status}
+            {loan.status === "borrowed" ? "Checked Out" : "Returned"}
           </Badge>
           {onReturn && (
             <Button size="sm" variant="outline" disabled={returning} onClick={onReturn}>
-              {returning ? "Returning…" : "Return"}
+              {returning ? "Returning…" : "Check In"}
             </Button>
           )}
         </div>
