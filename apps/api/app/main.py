@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.logging import configure_logging, logger
 from app.lib.errors import ApiException
 from app.v1.routes.books import router as books_router
+from app.v1.routes.loans import router as loans_router
 from app.v1.routes.ping import router as ping_router
 from app.v1.routes.whoami import router as whoami_router
 
@@ -69,6 +70,7 @@ async def validation_exception_handler(
 app.include_router(ping_router, prefix="/v1")
 app.include_router(whoami_router, prefix="/v1")
 app.include_router(books_router, prefix="/v1")
+app.include_router(loans_router, prefix="/v1")
 
 
 # ── Health (public) ───────────────────────────────────────────────────────────

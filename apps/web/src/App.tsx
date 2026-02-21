@@ -6,6 +6,7 @@ import { BookDetail } from "@/pages/BookDetail";
 import { Books } from "@/pages/Books";
 import { Dashboard } from "@/pages/Dashboard";
 import { Home } from "@/pages/Home";
+import { Loans } from "@/pages/Loans";
 
 /** Renders children when signed in; redirects to /sign-in when signed out. */
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -57,6 +58,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <BookDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/loans"
+            element={
+              <ProtectedRoute>
+                <Loans />
               </ProtectedRoute>
             }
           />
