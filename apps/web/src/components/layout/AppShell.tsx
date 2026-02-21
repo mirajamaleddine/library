@@ -1,10 +1,12 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
+import { Link, NavLink, Outlet } from "react-router-dom";
+import { buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/cn";
 
 const NAV_LINKS = [
   { to: "/", label: "Home", end: true },
-  { to: "/dashboard", label: "Dashboard" },
+  { to: "/dashboard", label: "Dashboard", end: false },
 ] as const;
 
 export function AppShell() {
@@ -15,29 +17,48 @@ export function AppShell() {
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
           {/* Brand */}
           <NavLink to="/" className="flex items-center gap-2">
-            <span className="font-semibold text-foreground tracking-tight">Assessment App</span>
+            <span className="font-semibold text-foreground tracking-tight">Shelfbase</span>
           </NavLink>
 
-          {/* Nav links */}
-          <nav className="flex items-center gap-1" aria-label="Main navigation">
-            {NAV_LINKS.map(({ to, label, end }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={end}
-                className={({ isActive }) =>
-                  cn(
-                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                  )
-                }
+          <div className="flex items-center gap-3">
+            {/* Page links */}
+            <nav className="flex items-center gap-1" aria-label="Main navigation">
+              {NAV_LINKS.map(({ to, label, end }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={end}
+                  className={({ isActive }) =>
+                    cn(
+                      "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-accent text-accent-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                    )
+                  }
+                >
+                  {label}
+                </NavLink>
+              ))}
+            </nav>
+
+            <Separator orientation="vertical" className="h-5" />
+
+            {/* Auth controls */}
+            <SignedOut>
+              <Link
+                to="/sign-in"
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
               >
-                {label}
-              </NavLink>
-            ))}
-          </nav>
+                Sign in
+              </Link>
+            </SignedOut>
+
+            <SignedIn>
+              {/* Clerk's UserButton renders avatar + dropdown with sign-out */}
+              <UserButton />
+            </SignedIn>
+          </div>
         </div>
         <Separator />
       </header>

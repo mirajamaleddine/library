@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ApiStatusCard } from "@/features/system/ApiStatusCard";
+import { WhoamiCard } from "@/features/system/WhoamiCard";
 
 const PLACEHOLDER_STATS = [
   { label: "Assessments", value: "—" },
@@ -30,22 +31,24 @@ export function Dashboard() {
 
       <Separator />
 
-      {/* System status */}
+      {/* System + identity */}
       <div className="grid gap-4 sm:grid-cols-2">
         <ApiStatusCard />
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent activity</CardTitle>
-            <CardDescription>No activity yet.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Activity will appear here once features are implemented.
-            </p>
-          </CardContent>
-        </Card>
+        <WhoamiCard />
       </div>
+
+      {/* Recent activity */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent activity</CardTitle>
+          <CardDescription>No activity yet.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Activity will appear here once features are implemented.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }
