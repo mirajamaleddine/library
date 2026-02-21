@@ -52,7 +52,13 @@ class Loan(Base):
         nullable=False,
         index=True,
     )
-    borrower_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    # Exactly one of borrower_user_id / borrower_name must be set (enforced in service).
+    borrower_user_id: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True, index=True
+    )
+    borrower_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    # Staff member who processed the checkout.
+    processed_by_admin_id: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="borrowed", server_default="borrowed"
     )
@@ -63,10 +69,10 @@ class Loan(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    # Relationship — not eager by default; service re-queries with joinedload after writes.
+    # Relationship — loaded explicitly via joinedload after writes.
     book: Mapped["Book"] = relationship("Book", lazy="select")
 
-    # Convenience properties used by LoanOut (Pydantic from_attributes reads these).
+    # Convenience properties for Pydantic serialisation (from_attributes reads these).
     @property
     def book_title(self) -> str:
         return self.book.title if self.book else ""
@@ -80,4 +86,4 @@ class Loan(Base):
         return self.book.cover_image_url if self.book else None
 
     def __repr__(self) -> str:
-        return f"<Loan id={self.id} borrower={self.borrower_id!r} status={self.status!r}>"
+        return f"<Loan id={self.id} status={self.status!r}>"

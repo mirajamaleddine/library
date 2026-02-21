@@ -10,14 +10,14 @@ from sqlalchemy.orm import Session, joinedload
 from app.domain.models import Loan
 
 
-def find_active_loan_for_book(
-    db: Session, borrower_id: str, book_id: uuid.UUID
+def find_active_loan_for_user(
+    db: Session, borrower_user_id: str, book_id: uuid.UUID
 ) -> Optional[Loan]:
-    """Return the borrower's active (status=borrowed) loan for a book, if any."""
+    """Return a registered user's active (status=borrowed) loan for a book, if any."""
     return (
         db.query(Loan)
         .filter(
-            Loan.borrower_id == borrower_id,
+            Loan.borrower_user_id == borrower_user_id,
             Loan.book_id == book_id,
             Loan.status == "borrowed",
         )
@@ -28,7 +28,7 @@ def find_active_loan_for_book(
 def list_paginated(
     db: Session,
     *,
-    borrower_id: Optional[str] = None,
+    borrower_user_id: Optional[str] = None,
     book_id: Optional[uuid.UUID] = None,
     status: Optional[str] = None,
     limit: int = 21,
@@ -36,13 +36,13 @@ def list_paginated(
 ) -> List[Loan]:
     """
     Filtered, cursor-paginated loan list sorted by borrowed_at DESC, id DESC.
+    Pass borrower_user_id=None to list all loans (admin/librarian use).
     Cursor shape: {"ts": "<ISO datetime>", "id": "<uuid>"}
-    Caller should request limit+1 rows to detect a next page.
     """
     query = db.query(Loan).options(joinedload(Loan.book))
 
-    if borrower_id is not None:
-        query = query.filter(Loan.borrower_id == borrower_id)
+    if borrower_user_id is not None:
+        query = query.filter(Loan.borrower_user_id == borrower_user_id)
     if book_id is not None:
         query = query.filter(Loan.book_id == book_id)
     if status is not None:

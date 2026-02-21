@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     CLERK_ISSUER: str = ""
     CLERK_AUDIENCE: str = ""
 
+    # Clerk Secret Key — used to call Clerk's backend Management API (e.g. list users).
+    # Find it in Clerk Dashboard → API Keys → Secret keys.
+    CLERK_SECRET_KEY: str = "sk_test_E1RDOlAB7FWXYbHD0WZkf4SpeQz1Gecfi84jjRTPCk"
+
     # Admin role claim — checked on every write operation.
     # Set ADMIN_ROLE_CLAIM_KEY to the JWT claim that carries the role value (e.g. "role").
     # Set ADMIN_ROLE_VALUE to the value that identifies an admin (e.g. "admin").
