@@ -24,6 +24,7 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+    --font-geist: "Geist", sans-serif;
   }
 
   .dark {
@@ -48,12 +49,18 @@
     --ring: 212.7 26.8% 83.9%;
   }
 }
-
+.noto-serif-display {
+  font-family: "Noto Serif Display", serif;
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-style: normal;
+}
 @layer base {
   * {
     @apply border-border;
   }
   body {
+    font-family: var(--font-geist);
     @apply bg-background text-foreground;
   }
 }

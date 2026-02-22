@@ -14,7 +14,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
     <>
       <SignedIn>{children}</SignedIn>
       <SignedOut>
-        <Navigate to="/sign-in" replace />
+        <Navigate to="/home" replace />
       </SignedOut>
     </>
   );
@@ -41,42 +41,21 @@ export default function App() {
             </div>
           }
         />
-
+        <Route path="/home" element={<Home />} />
         {/* App shell routes */}
-        <Route element={<AppShell />}>
-          <Route path="/" element={<Home />} />
-          <Route
-            path="/books"
-            element={
-              <ProtectedRoute>
-                <Books />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/books/:id"
-            element={
-              <ProtectedRoute>
-                <BookDetail />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/loans"
-            element={
-              <ProtectedRoute>
-                <Loans />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <AppShell />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Books />} />
+          <Route path="/books" element={<Books />} />
+          <Route path="/books/:id" element={<BookDetail />} />
+          <Route path="/loans" element={<Loans />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
