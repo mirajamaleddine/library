@@ -1,9 +1,18 @@
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
-import { SignedIn, UserButton } from "@clerk/clerk-react";
-import { GalleryVerticalEnd } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/cn";
+import { DYNAMIC_SEGMENT_TITLE, NAV_ITEMS, PATHS, SEGMENT_TITLES } from "@/lib/routes";
+import { SignedIn, useAuth, UserAvatar, useUser } from "@clerk/clerk-react";
+import { ChevronsUpDown, GalleryVerticalEnd, LogOut, Settings } from "lucide-react";
 import type React from "react";
 import { Fragment } from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -24,12 +33,13 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "../ui/breadcrumb";
-import { DYNAMIC_SEGMENT_TITLE, NAV_ITEMS, PATHS, SEGMENT_TITLES } from "@/lib/routes";
-import { cn } from "@/lib/cn";
 
 function useBreadcrumbs(): { label: string; path: string | null }[] {
   const { pathname } = useLocation();
-  const segments = pathname.replace(/^\/|\/$/g, "").split("/").filter(Boolean);
+  const segments = pathname
+    .replace(/^\/|\/$/g, "")
+    .split("/")
+    .filter(Boolean);
 
   if (segments.length === 0) {
     return [{ label: SEGMENT_TITLES.books ?? "Books", path: null }];
@@ -48,6 +58,58 @@ function useBreadcrumbs(): { label: string; path: string | null }[] {
   }
 
   return crumbs;
+}
+
+function SidebarUserBlock() {
+  const { user, isLoaded } = useUser();
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
+
+  if (!isLoaded || !user) return null;
+
+  const firstName = user.firstName ?? "";
+  const lastName = user.lastName ?? "";
+  const displayName =
+    [firstName, lastName].filter(Boolean).join(" ") ||
+    (user.username ?? null) ||
+    (user.primaryEmailAddress?.emailAddress ?? null) ||
+    "User";
+  const email = user.primaryEmailAddress?.emailAddress ?? null;
+  const trigger = (
+    <SidebarMenuButton
+      size="lg"
+      className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+    >
+      <UserAvatar />
+      <div className="grid flex-1 text-left text-sm leading-tight">
+        <span className="truncate font-medium">{displayName}</span>
+        {email != null && email !== "" && <span className="truncate text-xs">{email}</span>}
+      </div>
+      <ChevronsUpDown className="ml-auto size-4" />
+    </SidebarMenuButton>
+  );
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent
+        className="w-64 rounded-lg"
+        side={isMobile ? "bottom" : "top"}
+        align="center"
+        sideOffset={4}
+      >
+        <DropdownMenuItem onClick={() => navigate(PATHS.settings)}>
+          <Settings className="size-4" />
+          Settings
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => void signOut()} variant="destructive">
+          <LogOut className="size-4" />
+          Log out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 export function AppShell() {
@@ -127,7 +189,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         <SignedIn>
-          <UserButton />
+          <SidebarUserBlock />
         </SignedIn>
       </SidebarFooter>
     </Sidebar>

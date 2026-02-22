@@ -6,6 +6,7 @@ import { Dashboard } from "@/pages/Dashboard";
 import { Home } from "@/pages/Home";
 import { Loans } from "@/pages/Loans";
 import { NewBook } from "@/pages/NewBook";
+import { Settings } from "@/pages/Settings";
 import { SignIn, SignUp, useAuth } from "@clerk/clerk-react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
@@ -57,6 +58,7 @@ export default function App() {
           </Route>
           <Route path={ROUTES.loans.path} element={<Loans />} />
           <Route path={ROUTES.dashboard.path} element={<Dashboard />} />
+          <Route path={ROUTES.settings.path} element={<Settings />} />
           <Route path="*" element={<Navigate to={PATHS.home} replace />} />
         </Route>
       </Routes>
