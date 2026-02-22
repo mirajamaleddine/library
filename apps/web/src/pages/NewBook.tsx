@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuthedFetch } from "@/api/client";
 import { HttpError } from "@/api/http";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser } from "@/features/auth/useCurrentUser";
-import { createBook } from "@/features/books/api";
+import { useCreateBook } from "@/features/books/hooks";
 import { type BookCreate } from "@/features/books/types";
 
 const EMPTY_FORM: BookCreate = {
@@ -22,33 +21,26 @@ const EMPTY_FORM: BookCreate = {
 };
 
 export function NewBook() {
-  const authedFetch = useAuthedFetch();
-  const authedFetchRef = useRef(authedFetch);
-  authedFetchRef.current = authedFetch;
   const navigate = useNavigate();
 
   const { permissions } = useCurrentUser();
   const canManageBooks = permissions.includes("manage_books");
 
+  const createMutation = useCreateBook();
+
   const [form, setForm] = useState<BookCreate>(EMPTY_FORM);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    setCreating(true);
-    setCreateError(null);
     try {
-      const created = await createBook(authedFetchRef.current, {
+      const created = await createMutation.mutateAsync({
         ...form,
         publishedYear: form.publishedYear ?? undefined,
         coverImageUrl: form.coverImageUrl || undefined,
       });
       navigate(`/books/${created.id}`);
-    } catch (err) {
-      setCreateError(err instanceof HttpError ? err.error.message : "Failed to create book.");
-    } finally {
-      setCreating(false);
+    } catch {
+      // error is captured in createMutation.error
     }
   }
 
@@ -152,11 +144,17 @@ export function NewBook() {
             </Field>
             {form.coverImageUrl && <CoverPreview url={form.coverImageUrl} />}
 
-            {createError && <p className="text-sm text-destructive">{createError}</p>}
+            {createMutation.isError && (
+              <p className="text-sm text-destructive">
+                {createMutation.error instanceof HttpError
+                  ? createMutation.error.error.message
+                  : "Failed to create book."}
+              </p>
+            )}
           </CardContent>
           <CardFooter className="gap-2">
-            <Button type="submit" disabled={creating}>
-              {creating ? "Creating…" : "Create book"}
+            <Button type="submit" disabled={createMutation.isPending}>
+              {createMutation.isPending ? "Creating…" : "Create book"}
             </Button>
             <Link to="/books" className={buttonVariants({ variant: "outline" })}>
               Cancel
