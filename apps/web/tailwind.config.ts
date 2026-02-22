@@ -45,9 +45,21 @@ const config: Config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      textShadow: {
+        sm: "0 1px 2px rgba(0,0,0,0.05)",
+        DEFAULT: "0 1px 3px rgba(0,0,0,0.08)",
+        hero: "0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)",
+      },
     },
   },
-  plugins: [],
+  plugins: [
+    function ({ matchUtilities, theme }) {
+      matchUtilities(
+        { "text-shadow": (value) => ({ textShadow: value }) },
+        { values: theme("textShadow") }
+      );
+    },
+  ],
 };
 
 export default config;
