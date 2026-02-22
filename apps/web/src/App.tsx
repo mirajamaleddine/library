@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/layout/AppShell";
+import { PATHS, ROUTES } from "@/lib/routes";
 import { BookDetail } from "@/pages/BookDetail";
 import { Books } from "@/pages/Books";
 import { Dashboard } from "@/pages/Dashboard";
@@ -46,18 +47,17 @@ export default function App() {
           }
         />
         <Route path="/home" element={<Home />} />
-        {/* App shell routes */}
-        <Route
-          path="/"
-          element={<ProtectedShellRoute />}
-        >
+        {/* App shell routes — paths from @/lib/routes */}
+        <Route path="/" element={<ProtectedShellRoute />}>
           <Route index element={<Books />} />
-          <Route path="books" element={<Books />} />
-          <Route path="books/:id" element={<BookDetail />} />
-          <Route path="books/new" element={<NewBook />} />
-          <Route path="loans" element={<Loans />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path={ROUTES.books.path}>
+            <Route index element={<Books />} />
+            <Route path={ROUTES.books.children.id.path} element={<BookDetail />} />
+            <Route path={ROUTES.books.children.new.path} element={<NewBook />} />
+          </Route>
+          <Route path={ROUTES.loans.path} element={<Loans />} />
+          <Route path={ROUTES.dashboard.path} element={<Dashboard />} />
+          <Route path="*" element={<Navigate to={PATHS.home} replace />} />
         </Route>
       </Routes>
     </BrowserRouter>
