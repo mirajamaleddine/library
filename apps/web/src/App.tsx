@@ -1,23 +1,26 @@
-import { SignIn, SignUp, SignedIn, SignedOut } from "@clerk/clerk-react";
-import { type ReactNode } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { BookDetail } from "@/pages/BookDetail";
 import { Books } from "@/pages/Books";
 import { Dashboard } from "@/pages/Dashboard";
 import { Home } from "@/pages/Home";
 import { Loans } from "@/pages/Loans";
+import { SignIn, SignUp, useAuth } from "@clerk/clerk-react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
-/** Renders children when signed in; redirects to /sign-in when signed out. */
-function ProtectedRoute({ children }: { children: ReactNode }) {
-  return (
-    <>
-      <SignedIn>{children}</SignedIn>
-      <SignedOut>
-        <Navigate to="/home" replace />
-      </SignedOut>
-    </>
-  );
+/** Protects the app shell without remount flicker on sub-route navigation. */
+function ProtectedShellRoute() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  // Prevent redirect/render jitter while Clerk is hydrating auth state.
+  if (!isLoaded) {
+    return null;
+  }
+
+  if (!isSignedIn) {
+    return <Navigate to="/home" replace />;
+  }
+
+  return <AppShell />;
 }
 
 export default function App() {
@@ -45,17 +48,13 @@ export default function App() {
         {/* App shell routes */}
         <Route
           path="/"
-          element={
-            <ProtectedRoute>
-              <AppShell />
-            </ProtectedRoute>
-          }
+          element={<ProtectedShellRoute />}
         >
           <Route index element={<Books />} />
-          <Route path="/books" element={<Books />} />
-          <Route path="/books/:id" element={<BookDetail />} />
-          <Route path="/loans" element={<Loans />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="books" element={<Books />} />
+          <Route path="books/:id" element={<BookDetail />} />
+          <Route path="loans" element={<Loans />} />
+          <Route path="dashboard" element={<Dashboard />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
