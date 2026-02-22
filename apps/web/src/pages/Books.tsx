@@ -3,28 +3,16 @@ import { Link } from "react-router-dom";
 import { useAuthedFetch } from "@/api/client";
 import { HttpError } from "@/api/http";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
-import { createBook, deleteBook, listBooks } from "@/features/books/api";
-import { type BookCreate, type BookOut, type SortOption } from "@/features/books/types";
+import { deleteBook, listBooks } from "@/features/books/api";
+import { type BookOut, type SortOption } from "@/features/books/types";
 import { useCurrentUser } from "@/features/auth/useCurrentUser";
 import { cn } from "@/lib/cn";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-const EMPTY_FORM: BookCreate = {
-  title: "",
-  author: "",
-  description: "",
-  isbn: "",
-  publishedYear: undefined,
-  availableCopies: 1,
-  coverImageUrl: "",
-};
 
 const SORT_LABELS: Record<SortOption, string> = {
   "createdAt:desc": "Newest first",
@@ -55,10 +43,6 @@ export function Books() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ── Create form state ───────────────────────────────────────────────────────
-  const [form, setForm] = useState<BookCreate>(EMPTY_FORM);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // ── Debounce search input ───────────────────────────────────────────────────
@@ -112,40 +96,6 @@ export function Books() {
     }
   }
 
-  // ── Create ──────────────────────────────────────────────────────────────────
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setCreating(true);
-    setCreateError(null);
-    try {
-      const created = await createBook(authedFetchRef.current, {
-        ...form,
-        publishedYear: form.publishedYear ?? undefined,
-        coverImageUrl: form.coverImageUrl || undefined,
-      });
-      setForm(EMPTY_FORM);
-      // Optimistically prepend if on createdAt:desc, otherwise just reload.
-      if (sort === "createdAt:desc") {
-        setBooks((prev) => [created, ...prev]);
-      } else {
-        // Trigger a full reload by resetting the debounced query (no-op hack —
-        // easiest way is to force the effect by toggling a counter).
-        const result = await listBooks(authedFetchRef.current, {
-          query: debouncedQuery || undefined,
-          availableOnly,
-          sort,
-          limit: 20,
-        });
-        setBooks(result.items);
-        setNextCursor(result.nextCursor);
-      }
-    } catch (err) {
-      setCreateError(err instanceof HttpError ? err.error.message : "Failed to create book.");
-    } finally {
-      setCreating(false);
-    }
-  }
-
   // ── Delete ──────────────────────────────────────────────────────────────────
   async function handleDelete(book: BookOut) {
     if (!window.confirm(`Delete "${book.title}"?`)) return;
@@ -168,96 +118,12 @@ export function Books() {
         <p className="mt-1 text-muted-foreground">Browse the library catalogue.</p>
       </div>
 
-      {/* Create form — admin only */}
       {canManageBooks && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Add a book</CardTitle>
-          </CardHeader>
-          <form onSubmit={(e) => void handleCreate(e)}>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Title *">
-                  <Input
-                    required
-                    value={form.title}
-                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                    placeholder="The Name of the Wind"
-                  />
-                </Field>
-                <Field label="Author *">
-                  <Input
-                    required
-                    value={form.author}
-                    onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))}
-                    placeholder="Patrick Rothfuss"
-                  />
-                </Field>
-              </div>
-
-              <Field label="Description">
-                <Textarea
-                  value={form.description ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  placeholder="A short description…"
-                  rows={3}
-                />
-              </Field>
-
-              <div className="grid gap-4 sm:grid-cols-3">
-                <Field label="ISBN">
-                  <Input
-                    value={form.isbn ?? ""}
-                    onChange={(e) => setForm((f) => ({ ...f, isbn: e.target.value }))}
-                    placeholder="978-0-7564-0407-1"
-                  />
-                </Field>
-                <Field label="Published year">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={new Date().getFullYear()}
-                    value={form.publishedYear ?? ""}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        publishedYear: e.target.value ? Number(e.target.value) : undefined,
-                      }))
-                    }
-                    placeholder="2007"
-                  />
-                </Field>
-                <Field label="Available copies">
-                  <Input
-                    type="number"
-                    min={0}
-                    value={form.availableCopies ?? 1}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, availableCopies: Number(e.target.value) }))
-                    }
-                  />
-                </Field>
-              </div>
-
-              <Field label="Cover image URL">
-                <Input
-                  type="url"
-                  value={form.coverImageUrl ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, coverImageUrl: e.target.value }))}
-                  placeholder="https://covers.openlibrary.org/b/id/123-L.jpg"
-                />
-              </Field>
-              {form.coverImageUrl && <CoverPreview url={form.coverImageUrl} />}
-
-              {createError && <p className="text-sm text-destructive">{createError}</p>}
-            </CardContent>
-            <CardFooter>
-              <Button type="submit" disabled={creating}>
-                {creating ? "Creating…" : "Create book"}
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
+        <div className="flex justify-end">
+          <Link to="/books/new" className={buttonVariants()}>
+            New book
+          </Link>
+        </div>
       )}
 
       {/* ── Filter toolbar ───────────────────────────────────────────────────── */}
@@ -413,33 +279,3 @@ function BookThumbnail({ url }: { url: string | null }) {
   );
 }
 
-function CoverPreview({ url }: { url: string }) {
-  const [broken, setBroken] = useState(false);
-  const prevUrl = useRef(url);
-  if (prevUrl.current !== url) {
-    prevUrl.current = url;
-    setBroken(false);
-  }
-  if (broken) {
-    return <p className="text-xs text-muted-foreground">Image failed to load — check the URL.</p>;
-  }
-  return (
-    <img
-      src={url}
-      alt="cover preview"
-      className="max-h-40 rounded-md shadow-sm border border-border object-cover"
-      onError={() => setBroken(true)}
-    />
-  );
-}
-
-// ── Field wrapper ─────────────────────────────────────────────────────────────
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      {children}
-    </div>
-  );
-}

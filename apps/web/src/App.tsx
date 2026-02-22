@@ -4,6 +4,7 @@ import { Books } from "@/pages/Books";
 import { Dashboard } from "@/pages/Dashboard";
 import { Home } from "@/pages/Home";
 import { Loans } from "@/pages/Loans";
+import { NewBook } from "@/pages/NewBook";
 import { SignIn, SignUp, useAuth } from "@clerk/clerk-react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
@@ -53,6 +54,7 @@ export default function App() {
           <Route index element={<Books />} />
           <Route path="books" element={<Books />} />
           <Route path="books/:id" element={<BookDetail />} />
+          <Route path="books/new" element={<NewBook />} />
           <Route path="loans" element={<Loans />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="*" element={<Navigate to="/" replace />} />
