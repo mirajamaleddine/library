@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useCurrentUser } from "@/features/auth/useCurrentUser";
 
 export function WhoamiCard() {
-  const { state, userId, permissions, refetch } = useCurrentUser();
+  const { isLoading, isSuccess, isError, errorMessage, userId, permissions, refetch } =
+    useCurrentUser();
 
   return (
     <Card>
@@ -16,15 +17,15 @@ export function WhoamiCard() {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {state.status === "loading" && (
+        {isLoading && (
           <p className="text-sm text-muted-foreground animate-pulse">Loading…</p>
         )}
 
-        {state.status === "error" && (
-          <p className="text-sm text-destructive">{state.message}</p>
+        {isError && (
+          <p className="text-sm text-destructive">{errorMessage}</p>
         )}
 
-        {state.status === "success" && (
+        {isSuccess && (
           <dl className="space-y-3 text-sm">
             <div>
               <dt className="text-xs font-medium text-muted-foreground mb-0.5">User ID</dt>
@@ -53,9 +54,9 @@ export function WhoamiCard() {
           variant="outline"
           size="sm"
           onClick={() => void refetch()}
-          disabled={state.status === "loading"}
+          disabled={isLoading}
         >
-          {state.status === "loading" ? "Loading…" : "Refresh"}
+          {isLoading ? "Loading…" : "Refresh"}
         </Button>
       </CardFooter>
     </Card>

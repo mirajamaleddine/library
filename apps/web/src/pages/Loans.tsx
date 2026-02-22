@@ -1,14 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuthedFetch } from "@/api/client";
 import { HttpError } from "@/api/http";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { listLoans, returnLoan } from "@/features/loans/api";
-import { type LoanOut } from "@/features/loans/types";
 import { useCurrentUser } from "@/features/auth/useCurrentUser";
+import { useLoans, useReturnLoan } from "@/features/loans/hooks";
+import { type LoanOut } from "@/features/loans/types";
 import { cn } from "@/lib/cn";
 
 type StatusFilter = "all" | "borrowed" | "returned";
@@ -20,82 +19,27 @@ const STATUS_LABELS: Record<StatusFilter, string> = {
 };
 
 export function Loans() {
-  const authedFetch = useAuthedFetch();
-  const authedFetchRef = useRef(authedFetch);
-  authedFetchRef.current = authedFetch;
-
   const { permissions } = useCurrentUser();
   const canManageLoans = permissions.includes("manage_loans");
   const canViewAllLoans = permissions.includes("view_all_loans");
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [loans, setLoans] = useState<LoanOut[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [returningId, setReturningId] = useState<string | null>(null);
 
-  // ── Load first page ─────────────────────────────────────────────────────────
-  useEffect(() => {
-    async function fetchFirst() {
-      setLoading(true);
-      setError(null);
-      setLoans([]);
-      setNextCursor(null);
-      try {
-        const result = await listLoans(authedFetchRef.current, {
-          status: statusFilter === "all" ? undefined : statusFilter,
-          limit: 20,
-        });
-        setLoans(result.items);
-        setNextCursor(result.nextCursor);
-      } catch (err) {
-        setError(err instanceof HttpError ? err.error.message : "Failed to load loans.");
-      } finally {
-        setLoading(false);
-      }
-    }
-    void fetchFirst();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
+  const loansQuery = useLoans({
+    status: statusFilter === "all" ? undefined : statusFilter,
+    limit: 20,
+  });
 
-  // ── Load more ───────────────────────────────────────────────────────────────
-  async function loadMore() {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const result = await listLoans(authedFetchRef.current, {
-        status: statusFilter === "all" ? undefined : statusFilter,
-        limit: 20,
-        cursor: nextCursor,
-      });
-      setLoans((prev) => [...prev, ...result.items]);
-      setNextCursor(result.nextCursor);
-    } catch {
-      // silently ignore
-    } finally {
-      setLoadingMore(false);
-    }
-  }
+  const returnMutation = useReturnLoan();
 
-  // ── Return a loan (staff only) ───────────────────────────────────────────────
+  const loans = loansQuery.data?.pages.flatMap((p) => p.items) ?? [];
+
   async function handleReturn(loan: LoanOut) {
     if (!window.confirm(`Return "${loan.bookTitle}"?`)) return;
-    setReturningId(loan.id);
     try {
-      await returnLoan(authedFetchRef.current, loan.id);
-      // Reload page 1 so available_copies reflect correctly.
-      const result = await listLoans(authedFetchRef.current, {
-        status: statusFilter === "all" ? undefined : statusFilter,
-        limit: 20,
-      });
-      setLoans(result.items);
-      setNextCursor(result.nextCursor);
+      await returnMutation.mutateAsync(loan.id);
     } catch (err) {
       alert(err instanceof HttpError ? err.error.message : "Failed to return loan.");
-    } finally {
-      setReturningId(null);
     }
   }
 
@@ -106,13 +50,11 @@ export function Loans() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">{pageTitle}</h1>
         <p className="mt-1 text-muted-foreground">{pageDescription}</p>
       </div>
 
-      {/* Status filter buttons */}
       <div className="flex gap-1.5">
         {(Object.entries(STATUS_LABELS) as [StatusFilter, string][]).map(([value, label]) => (
           <button
@@ -132,14 +74,17 @@ export function Loans() {
 
       <Separator />
 
-      {/* List */}
-      {loading && (
+      {loansQuery.isLoading && (
         <p className="text-sm text-muted-foreground animate-pulse">Loading…</p>
       )}
-      {!loading && error && (
-        <p className="text-sm text-destructive">{error}</p>
+      {loansQuery.isError && (
+        <p className="text-sm text-destructive">
+          {loansQuery.error instanceof HttpError
+            ? loansQuery.error.error.message
+            : "Failed to load loans."}
+        </p>
       )}
-      {!loading && !error && loans.length === 0 && (
+      {loansQuery.isSuccess && loans.length === 0 && (
         <p className="text-sm text-muted-foreground">No loans found.</p>
       )}
 
@@ -150,7 +95,7 @@ export function Loans() {
               key={loan.id}
               loan={loan}
               showBorrower={canViewAllLoans}
-              returning={returningId === loan.id}
+              returning={returnMutation.isPending && returnMutation.variables === loan.id}
               onReturn={
                 canManageLoans && loan.status === "borrowed"
                   ? () => void handleReturn(loan)
@@ -161,19 +106,20 @@ export function Loans() {
         </div>
       )}
 
-      {/* Load more */}
-      {nextCursor && (
+      {loansQuery.hasNextPage && (
         <div className="flex justify-center pt-2">
-          <Button variant="outline" onClick={() => void loadMore()} disabled={loadingMore}>
-            {loadingMore ? "Loading…" : "Load more"}
+          <Button
+            variant="outline"
+            onClick={() => void loansQuery.fetchNextPage()}
+            disabled={loansQuery.isFetchingNextPage}
+          >
+            {loansQuery.isFetchingNextPage ? "Loading…" : "Load more"}
           </Button>
         </div>
       )}
     </div>
   );
 }
-
-// ── Loan card ─────────────────────────────────────────────────────────────────
 
 function LoanCard({
   loan,

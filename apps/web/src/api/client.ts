@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { apiFetch } from "./http";
 
@@ -27,4 +28,15 @@ export function useAuthedFetch(): AuthedFetch {
       },
     });
   };
+}
+
+/**
+ * Stable ref to the latest `AuthedFetch` — safe to call inside React Query
+ * queryFn / mutationFn without stale closure issues.
+ */
+export function useFetchRef() {
+  const f = useAuthedFetch();
+  const ref = useRef(f);
+  ref.current = f;
+  return ref;
 }

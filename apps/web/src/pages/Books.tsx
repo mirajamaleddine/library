@@ -1,18 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuthedFetch } from "@/api/client";
 import { HttpError } from "@/api/http";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { deleteBook, listBooks } from "@/features/books/api";
-import { type BookOut, type SortOption } from "@/features/books/types";
 import { useCurrentUser } from "@/features/auth/useCurrentUser";
+import { useBooks, useDeleteBook } from "@/features/books/hooks";
+import { type BookOut, type SortOption } from "@/features/books/types";
 import { cn } from "@/lib/cn";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 const SORT_LABELS: Record<SortOption, string> = {
   "createdAt:desc": "Newest first",
@@ -20,97 +17,40 @@ const SORT_LABELS: Record<SortOption, string> = {
   "title:asc": "Title A–Z",
 };
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export function Books() {
-  const authedFetch = useAuthedFetch();
-  const authedFetchRef = useRef(authedFetch);
-  authedFetchRef.current = authedFetch;
-
   const { permissions } = useCurrentUser();
   const canManageBooks = permissions.includes("manage_books");
 
-  // ── Filter state ────────────────────────────────────────────────────────────
   const [searchInput, setSearchInput] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [availableOnly, setAvailableOnly] = useState(false);
   const [sort, setSort] = useState<SortOption>("createdAt:desc");
 
-  // ── List state ──────────────────────────────────────────────────────────────
-  const [books, setBooks] = useState<BookOut[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  // ── Debounce search input ───────────────────────────────────────────────────
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(searchInput.trim()), 300);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // ── Reload list when filters change ────────────────────────────────────────
-  useEffect(() => {
-    async function fetchFirst() {
-      setLoading(true);
-      setError(null);
-      try {
-        const result = await listBooks(authedFetchRef.current, {
-          query: debouncedQuery || undefined,
-          availableOnly,
-          sort,
-          limit: 20,
-        });
-        setBooks(result.items);
-        setNextCursor(result.nextCursor);
-      } catch (err) {
-        setError(err instanceof HttpError ? err.error.message : "Failed to load books.");
-      } finally {
-        setLoading(false);
-      }
-    }
-    void fetchFirst();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedQuery, availableOnly, sort]);
+  const booksQuery = useBooks({
+    query: debouncedQuery || undefined,
+    availableOnly,
+    sort,
+    limit: 20,
+  });
 
-  // ── Load more ───────────────────────────────────────────────────────────────
-  async function loadMore() {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const result = await listBooks(authedFetchRef.current, {
-        query: debouncedQuery || undefined,
-        availableOnly,
-        sort,
-        limit: 20,
-        cursor: nextCursor,
-      });
-      setBooks((prev) => [...prev, ...result.items]);
-      setNextCursor(result.nextCursor);
-    } catch {
-      // silently ignore load-more failures
-    } finally {
-      setLoadingMore(false);
-    }
-  }
+  const deleteMutation = useDeleteBook();
 
-  // ── Delete ──────────────────────────────────────────────────────────────────
+  const books = booksQuery.data?.pages.flatMap((p) => p.items) ?? [];
+
   async function handleDelete(book: BookOut) {
     if (!window.confirm(`Delete "${book.title}"?`)) return;
-    setDeletingId(book.id);
     try {
-      await deleteBook(authedFetchRef.current, book.id);
-      setBooks((prev) => prev.filter((b) => b.id !== book.id));
+      await deleteMutation.mutateAsync(book.id);
     } catch (err) {
       alert(err instanceof HttpError ? err.error.message : "Failed to delete book.");
-    } finally {
-      setDeletingId(null);
     }
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-8">
       <div>
@@ -126,7 +66,7 @@ export function Books() {
         </div>
       )}
 
-      {/* ── Filter toolbar ───────────────────────────────────────────────────── */}
+      {/* Filter toolbar */}
       <div className="flex flex-wrap items-center gap-3">
         <Input
           className="h-9 w-full sm:w-64"
@@ -163,14 +103,18 @@ export function Books() {
 
       <Separator />
 
-      {/* ── Book list ────────────────────────────────────────────────────────── */}
-      {loading && (
+      {/* Book list */}
+      {booksQuery.isLoading && (
         <p className="text-sm text-muted-foreground animate-pulse">Loading books…</p>
       )}
-      {!loading && error && (
-        <p className="text-sm text-destructive">{error}</p>
+      {booksQuery.isError && (
+        <p className="text-sm text-destructive">
+          {booksQuery.error instanceof HttpError
+            ? booksQuery.error.error.message
+            : "Failed to load books."}
+        </p>
       )}
-      {!loading && !error && books.length === 0 && (
+      {booksQuery.isSuccess && books.length === 0 && (
         <p className="text-sm text-muted-foreground">No books found.</p>
       )}
 
@@ -181,25 +125,27 @@ export function Books() {
               key={book.id}
               book={book}
               canManageBooks={canManageBooks}
-              deleting={deletingId === book.id}
+              deleting={deleteMutation.isPending && deleteMutation.variables === book.id}
               onDelete={() => void handleDelete(book)}
             />
           ))}
         </div>
       )}
 
-      {nextCursor && (
+      {booksQuery.hasNextPage && (
         <div className="flex justify-center pt-2">
-          <Button variant="outline" onClick={() => void loadMore()} disabled={loadingMore}>
-            {loadingMore ? "Loading…" : "Load more"}
+          <Button
+            variant="outline"
+            onClick={() => void booksQuery.fetchNextPage()}
+            disabled={booksQuery.isFetchingNextPage}
+          >
+            {booksQuery.isFetchingNextPage ? "Loading…" : "Load more"}
           </Button>
         </div>
       )}
     </div>
   );
 }
-
-// ── Book card ─────────────────────────────────────────────────────────────────
 
 function BookCard({
   book,
@@ -256,8 +202,6 @@ function BookCard({
   );
 }
 
-// ── Image helpers ─────────────────────────────────────────────────────────────
-
 function BookThumbnail({ url }: { url: string | null }) {
   const [broken, setBroken] = useState(false);
   if (!url || broken) {
@@ -278,4 +222,3 @@ function BookThumbnail({ url }: { url: string | null }) {
     />
   );
 }
-

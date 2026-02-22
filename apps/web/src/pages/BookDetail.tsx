@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useAuthedFetch } from "@/api/client";
 import { HttpError } from "@/api/http";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,53 +13,21 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { getBook } from "@/features/books/api";
-import { type BookOut } from "@/features/books/types";
-import { checkoutBook, listLoans, returnLoan } from "@/features/loans/api";
-import { type LoanOut } from "@/features/loans/types";
-import { listUsers } from "@/features/users/api";
-import { type ClerkUser } from "@/features/users/types";
 import { useCurrentUser } from "@/features/auth/useCurrentUser";
+import { useBook } from "@/features/books/hooks";
+import { type BookOut } from "@/features/books/types";
+import { useCheckoutBook, useLoans, useReturnLoan } from "@/features/loans/hooks";
+import { type LoanOut } from "@/features/loans/types";
+import { useUsers } from "@/features/users/hooks";
 import { cn } from "@/lib/cn";
-
-type BookState =
-  | { status: "loading" }
-  | { status: "success"; book: BookOut }
-  | { status: "error"; message: string };
 
 export function BookDetail() {
   const { id } = useParams<{ id: string }>();
-  const authedFetch = useAuthedFetch();
-  const authedFetchRef = useRef(authedFetch);
-  authedFetchRef.current = authedFetch;
 
   const { permissions } = useCurrentUser();
   const canManageLoans = permissions.includes("manage_loans");
-  const [state, setState] = useState<BookState>({ status: "loading" });
-  // Incrementing this triggers the ActiveLoansSection to re-fetch.
-  const [loansKey, setLoansKey] = useState(0);
 
-  async function loadBook() {
-    if (!id) return;
-    setState({ status: "loading" });
-    try {
-      const book = await getBook(authedFetchRef.current, id);
-      setState({ status: "success", book });
-    } catch (err) {
-      setState({
-        status: "error",
-        message: err instanceof HttpError ? err.error.message : "Failed to load book.",
-      });
-    }
-  }
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void loadBook(); }, [id]);
-
-  function handleLoanChange() {
-    void loadBook();            // refresh available_copies
-    setLoansKey((k) => k + 1); // refresh active loans list
-  }
+  const bookQuery = useBook(id);
 
   return (
     <div className="space-y-6">
@@ -68,23 +35,23 @@ export function BookDetail() {
         <Link to="/books">← Back to books</Link>
       </Button>
 
-      {state.status === "loading" && (
+      {bookQuery.isLoading && (
         <p className="text-sm text-muted-foreground animate-pulse">Loading…</p>
       )}
-      {state.status === "error" && (
-        <p className="text-sm text-destructive">{state.message}</p>
+      {bookQuery.isError && (
+        <p className="text-sm text-destructive">
+          {bookQuery.error instanceof HttpError
+            ? bookQuery.error.error.message
+            : "Failed to load book."}
+        </p>
       )}
-      {state.status === "success" && (
+      {bookQuery.isSuccess && (
         <>
-          <BookCard book={state.book} />
+          <BookCard book={bookQuery.data} />
           {canManageLoans && (
             <>
-              <CheckoutSection book={state.book} onSuccess={handleLoanChange} />
-              <ActiveLoansSection
-                bookId={state.book.id}
-                loansKey={loansKey}
-                onCheckIn={handleLoanChange}
-              />
+              <CheckoutSection book={bookQuery.data} />
+              <ActiveLoansSection bookId={bookQuery.data.id} />
             </>
           )}
         </>
@@ -92,8 +59,6 @@ export function BookDetail() {
     </div>
   );
 }
-
-// ── Book detail card ──────────────────────────────────────────────────────────
 
 function BookCard({ book }: { book: BookOut }) {
   return (
@@ -138,41 +103,15 @@ function BookCard({ book }: { book: BookOut }) {
   );
 }
 
-// ── Checkout section (staff only) ─────────────────────────────────────────────
-
 type BorrowerType = "user" | "anonymous";
-type CheckoutState = "idle" | "processing" | "success" | "error";
 
-function CheckoutSection({
-  book,
-  onSuccess,
-}: {
-  book: BookOut;
-  onSuccess: () => void;
-}) {
-  const authedFetch = useAuthedFetch();
-  const authedFetchRef = useRef(authedFetch);
-  authedFetchRef.current = authedFetch;
-
+function CheckoutSection({ book }: { book: BookOut }) {
   const [borrowerType, setBorrowerType] = useState<BorrowerType>("user");
   const [selectedUserId, setSelectedUserId] = useState("");
   const [borrowerName, setBorrowerName] = useState("");
-  const [checkoutState, setCheckoutState] = useState<CheckoutState>("idle");
-  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
-  // Users for the dropdown
-  const [users, setUsers] = useState<ClerkUser[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-
-  useEffect(() => {
-    if (borrowerType !== "user") return;
-    setUsersLoading(true);
-    listUsers(authedFetchRef.current)
-      .then(setUsers)
-      .catch(() => setUsers([]))
-      .finally(() => setUsersLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [borrowerType]);
+  const usersQuery = useUsers(borrowerType === "user");
+  const checkoutMutation = useCheckoutBook();
 
   const unavailable = book.availableCopies <= 0;
   const inputEmpty =
@@ -180,30 +119,22 @@ function CheckoutSection({
 
   function handleTypeChange(t: BorrowerType) {
     setBorrowerType(t);
-    setCheckoutState("idle");
-    setCheckoutError(null);
+    checkoutMutation.reset();
     setSelectedUserId("");
     setBorrowerName("");
   }
 
   async function handleCheckout() {
-    setCheckoutState("processing");
-    setCheckoutError(null);
     try {
-      await checkoutBook(authedFetchRef.current, {
+      await checkoutMutation.mutateAsync({
         bookId: book.id,
         borrowerUserId: borrowerType === "user" ? selectedUserId : undefined,
         borrowerName: borrowerType === "anonymous" ? borrowerName.trim() : undefined,
       });
-      setCheckoutState("success");
       setSelectedUserId("");
       setBorrowerName("");
-      onSuccess();
-    } catch (err) {
-      setCheckoutState("error");
-      setCheckoutError(
-        err instanceof HttpError ? err.error.message : "Checkout failed.",
-      );
+    } catch {
+      // error is captured in checkoutMutation.error
     }
   }
 
@@ -219,7 +150,6 @@ function CheckoutSection({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Borrower type toggle */}
         <div className="flex gap-2">
           {(["user", "anonymous"] as BorrowerType[]).map((t) => (
             <button
@@ -237,10 +167,9 @@ function CheckoutSection({
           ))}
         </div>
 
-        {/* Borrower input */}
         {borrowerType === "user" ? (
           <Field label="Borrower">
-            {usersLoading ? (
+            {usersQuery.isLoading ? (
               <p className="text-sm text-muted-foreground animate-pulse">Loading users…</p>
             ) : (
               <select
@@ -254,7 +183,7 @@ function CheckoutSection({
                 )}
               >
                 <option value="">Select a user…</option>
-                {users.map((u) => (
+                {(usersQuery.data ?? []).map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.displayName}
                     {u.email ? ` — ${u.email}` : ""}
@@ -273,8 +202,7 @@ function CheckoutSection({
           </Field>
         )}
 
-        {/* Feedback */}
-        {checkoutState === "success" && (
+        {checkoutMutation.isSuccess && (
           <p className="text-sm text-green-600 dark:text-green-400">
             Checked out successfully! View in{" "}
             <Link to="/loans" className="underline underline-offset-2 font-medium">
@@ -283,81 +211,48 @@ function CheckoutSection({
             .
           </p>
         )}
-        {checkoutState === "error" && checkoutError && (
-          <p className="text-sm text-destructive">{checkoutError}</p>
+        {checkoutMutation.isError && (
+          <p className="text-sm text-destructive">
+            {checkoutMutation.error instanceof HttpError
+              ? checkoutMutation.error.error.message
+              : "Checkout failed."}
+          </p>
         )}
       </CardContent>
 
       <CardFooter>
         <Button
-          disabled={unavailable || inputEmpty || checkoutState === "processing"}
+          disabled={unavailable || inputEmpty || checkoutMutation.isPending}
           onClick={() => void handleCheckout()}
         >
-          {checkoutState === "processing" ? "Processing…" : "Check Out"}
+          {checkoutMutation.isPending ? "Processing…" : "Check Out"}
         </Button>
       </CardFooter>
     </Card>
   );
 }
 
-// ── Active loans section (staff only) ────────────────────────────────────────
+function ActiveLoansSection({ bookId }: { bookId: string }) {
+  const loansQuery = useLoans({ bookId, status: "borrowed", limit: 50 });
+  const returnMutation = useReturnLoan();
 
-function ActiveLoansSection({
-  bookId,
-  loansKey,
-  onCheckIn,
-}: {
-  bookId: string;
-  loansKey: number;
-  onCheckIn: () => void;
-}) {
-  const authedFetch = useAuthedFetch();
-  const authedFetchRef = useRef(authedFetch);
-  authedFetchRef.current = authedFetch;
-
-  const [loans, setLoans] = useState<LoanOut[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [checkingInId, setCheckingInId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const result = await listLoans(authedFetchRef.current, {
-          bookId,
-          status: "borrowed",
-          limit: 50,
-        });
-        if (!cancelled) setLoans(result.items);
-      } catch {
-        if (!cancelled) setError("Failed to load active loans.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    void load();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookId, loansKey]);
+  const loans = loansQuery.data?.pages.flatMap((p) => p.items) ?? [];
 
   async function handleCheckIn(loan: LoanOut) {
-    if (!window.confirm(`Check in "${loan.bookTitle}" for ${loan.borrowerUserId ?? loan.borrowerName}?`)) return;
-    setCheckingInId(loan.id);
+    if (
+      !window.confirm(
+        `Check in "${loan.bookTitle}" for ${loan.borrowerUserId ?? loan.borrowerName}?`,
+      )
+    )
+      return;
     try {
-      await returnLoan(authedFetchRef.current, loan.id);
-      onCheckIn();
+      await returnMutation.mutateAsync(loan.id);
     } catch (err) {
       alert(err instanceof HttpError ? err.error.message : "Check-in failed.");
-    } finally {
-      setCheckingInId(null);
     }
   }
 
-  // Hide the whole section if loading done and nothing is out
-  if (!loading && loans.length === 0 && !error) return null;
+  if (!loansQuery.isLoading && loans.length === 0 && !loansQuery.isError) return null;
 
   return (
     <Card className="max-w-2xl">
@@ -365,11 +260,11 @@ function ActiveLoansSection({
         <CardTitle className="text-base">Currently Checked Out</CardTitle>
       </CardHeader>
       <CardContent>
-        {loading && (
+        {loansQuery.isLoading && (
           <p className="text-sm text-muted-foreground animate-pulse">Loading…</p>
         )}
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        {!loading && loans.length > 0 && (
+        {loansQuery.isError && <p className="text-sm text-destructive">Failed to load active loans.</p>}
+        {!loansQuery.isLoading && loans.length > 0 && (
           <ul className="space-y-2">
             {loans.map((loan, i) => (
               <li key={loan.id}>
@@ -386,10 +281,12 @@ function ActiveLoansSection({
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={checkingInId === loan.id}
+                    disabled={returnMutation.isPending && returnMutation.variables === loan.id}
                     onClick={() => void handleCheckIn(loan)}
                   >
-                    {checkingInId === loan.id ? "Returning…" : "Check In"}
+                    {returnMutation.isPending && returnMutation.variables === loan.id
+                      ? "Returning…"
+                      : "Check In"}
                   </Button>
                 </div>
               </li>
@@ -400,8 +297,6 @@ function ActiveLoansSection({
     </Card>
   );
 }
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function CoverImage({ url, title }: { url: string; title: string }) {
   const [broken, setBroken] = useState(false);
