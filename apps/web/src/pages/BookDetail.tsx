@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useCurrentUser } from "@/features/auth/useCurrentUser";
 import { useBook } from "@/features/books/hooks";
+import { DeleteBook } from "@/features/books/DeleteBook";
 import { type BookOut } from "@/features/books/types";
 import { useCheckoutBook, useLoans, useReturnLoan } from "@/features/loans/hooks";
 import { type LoanOut } from "@/features/loans/types";
@@ -20,6 +21,7 @@ export function BookDetail() {
   const { id } = useParams<{ id: string }>();
 
   const { permissions } = useCurrentUser();
+  const canManageBooks = permissions.includes("manage_books");
   const canManageLoans = permissions.includes("manage_loans");
 
   const bookQuery = useBook(id);
@@ -48,6 +50,11 @@ export function BookDetail() {
       {bookQuery.isSuccess && (
         <>
           <BookCard book={bookQuery.data} />
+          {canManageBooks && (
+            <div>
+              <DeleteBook book={bookQuery.data} />
+            </div>
+          )}
           {canManageLoans && (
             <div className="flex flex-row gap-4 w-full">
               <ActiveLoansSection bookId={bookQuery.data.id} />

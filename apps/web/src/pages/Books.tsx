@@ -3,7 +3,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useCurrentUser } from "@/features/auth/useCurrentUser";
-import { useBooks, useDeleteBook } from "@/features/books/hooks";
+import { useBooks } from "@/features/books/hooks";
 import { type BookOut, type SortOption } from "@/features/books/types";
 import { cn } from "@/lib/cn";
 import { PlusIcon } from "lucide-react";
@@ -37,18 +37,7 @@ export function Books() {
     limit: 20,
   });
 
-  const deleteMutation = useDeleteBook();
-
   const books = booksQuery.data?.pages.flatMap((p) => p.items) ?? [];
-
-  async function handleDelete(book: BookOut) {
-    if (!window.confirm(`Delete "${book.title}"?`)) return;
-    try {
-      await deleteMutation.mutateAsync(book.id);
-    } catch (err) {
-      alert(err instanceof HttpError ? err.error.message : "Failed to delete book.");
-    }
-  }
 
   return (
     <div className="space-y-8">
@@ -120,9 +109,6 @@ export function Books() {
             <BookCard
               key={book.id}
               book={book}
-              canManageBooks={canManageBooks}
-              deleting={deleteMutation.isPending && deleteMutation.variables === book.id}
-              onDelete={() => void handleDelete(book)}
             />
           ))}
         </div>
@@ -145,14 +131,8 @@ export function Books() {
 
 function BookCard({
   book,
-  canManageBooks,
-  deleting,
-  onDelete,
 }: {
   book: BookOut;
-  canManageBooks: boolean;
-  deleting: boolean;
-  onDelete: () => void;
 }) {
   return (
     <>
