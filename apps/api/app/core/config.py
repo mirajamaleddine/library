@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     ADMIN_ROLE_CLAIM_KEY: str = "role"
     ADMIN_ROLE_VALUE: str = "admin"
 
+    # OpenAI — used by the analytics AI insights service.
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4.1-mini"
+    ANALYTICS_DEFAULT_WINDOW_DAYS: int = 30
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
