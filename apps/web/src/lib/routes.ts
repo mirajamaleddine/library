@@ -23,11 +23,6 @@ export const ROUTES = {
     title: "Dashboard",
     nav: true,
   },
-  settings: {
-    path: "settings",
-    title: "Settings",
-    nav: false,
-  },
 } as const;
 
 /** Absolute paths for links and redirects. */
@@ -38,7 +33,6 @@ export const PATHS = {
   bookDetail: (id: string) => `/books/${id}`,
   loans: "/loans",
   dashboard: "/dashboard",
-  settings: "/settings",
 } as const;
 
 /** Segment -> breadcrumb title (path segment string -> label). */
@@ -47,7 +41,6 @@ export const SEGMENT_TITLES: Record<string, string> = {
   [ROUTES.books.children.new.path]: ROUTES.books.children.new.title,
   [ROUTES.loans.path]: ROUTES.loans.title,
   [ROUTES.dashboard.path]: ROUTES.dashboard.title,
-  [ROUTES.settings.path]: ROUTES.settings.title,
 };
 
 /** Title for dynamic segments (e.g. :id UUID). */

@@ -8,11 +8,11 @@ import { Separator } from "@/components/ui/separator";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/cn";
 import { DYNAMIC_SEGMENT_TITLE, NAV_ITEMS, PATHS, SEGMENT_TITLES } from "@/lib/routes";
-import { SignedIn, useAuth, UserAvatar, useUser } from "@clerk/clerk-react";
+import { SignedIn, useAuth, useClerk, UserAvatar, useUser } from "@clerk/clerk-react";
 import { ChevronsUpDown, GalleryVerticalEnd, LogOut, Settings } from "lucide-react";
 import type React from "react";
 import { Fragment } from "react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -63,9 +63,11 @@ function useBreadcrumbs(): { label: string; path: string | null }[] {
 function SidebarUserBlock() {
   const { user, isLoaded } = useUser();
   const { signOut } = useAuth();
-  const navigate = useNavigate();
+  const { openUserProfile } = useClerk();
   const isMobile = useIsMobile();
-
+  const navigateToProfile = () => {
+    void openUserProfile();
+  };
   if (!isLoaded || !user) return null;
 
   const firstName = user.firstName ?? "";
@@ -99,11 +101,11 @@ function SidebarUserBlock() {
         align="center"
         sideOffset={4}
       >
-        <DropdownMenuItem onClick={() => navigate(PATHS.settings)}>
+        <DropdownMenuItem onClick={() => navigateToProfile()}>
           <Settings className="size-4" />
           Settings
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => void signOut()} variant="destructive">
+        <DropdownMenuItem onClick={() => void signOut()}>
           <LogOut className="size-4" />
           Log out
         </DropdownMenuItem>
