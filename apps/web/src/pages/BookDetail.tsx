@@ -1,15 +1,7 @@
-import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
 import { HttpError } from "@/api/http";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -20,6 +12,9 @@ import { useCheckoutBook, useLoans, useReturnLoan } from "@/features/loans/hooks
 import { type LoanOut } from "@/features/loans/types";
 import { useUsers } from "@/features/users/hooks";
 import { cn } from "@/lib/cn";
+import { ChevronLeftIcon } from "lucide-react";
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
 
 export function BookDetail() {
   const { id } = useParams<{ id: string }>();
@@ -31,9 +26,14 @@ export function BookDetail() {
 
   return (
     <div className="space-y-6">
-      <Button variant="ghost" size="sm" asChild>
-        <Link to="/books">← Back to books</Link>
-      </Button>
+      <div className="flex items-center">
+        <Button variant="ghost" size="sm">
+          <Link to="/books">
+            <ChevronLeftIcon />
+          </Link>
+        </Button>
+        <span className="text-lg font-medium tracking-tight">Book Details</span>
+      </div>
 
       {bookQuery.isLoading && (
         <p className="text-sm text-muted-foreground animate-pulse">Loading…</p>
@@ -49,10 +49,10 @@ export function BookDetail() {
         <>
           <BookCard book={bookQuery.data} />
           {canManageLoans && (
-            <>
-              <CheckoutSection book={bookQuery.data} />
+            <div className="flex flex-row gap-4 w-full">
               <ActiveLoansSection bookId={bookQuery.data.id} />
-            </>
+              <CheckoutSection book={bookQuery.data} />
+            </div>
           )}
         </>
       )}
@@ -62,44 +62,31 @@ export function BookDetail() {
 
 function BookCard({ book }: { book: BookOut }) {
   return (
-    <Card className="max-w-2xl">
-      <CardHeader>
-        <div className="flex gap-5 items-start">
-          {book.coverImageUrl && <CoverImage url={book.coverImageUrl} title={book.title} />}
-          <div>
-            <CardTitle className="text-2xl">{book.title}</CardTitle>
-            <p className="text-muted-foreground mt-1">{book.author}</p>
-          </div>
+    <div className="flex flex-row gap-4 w-full">
+      <div className="flex-auto">
+        {book.coverImageUrl && <CoverImage url={book.coverImageUrl} title={book.title} />}
+      </div>
+      <div className="flex flex-col gap-4 flex-auto">
+        <div className="flex flex-col">
+          <span className="text-2xl font-medium tracking-tight">{book.title}</span>
+          <span className="text-muted-foreground">{book.author}</span>
         </div>
-      </CardHeader>
 
-      <CardContent className="space-y-5">
         {book.description && <p className="text-sm leading-relaxed">{book.description}</p>}
-
-        <Separator />
-
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
-          <Detail label="ISBN" value={book.isbn ?? "—"} />
-          <Detail label="Published" value={book.publishedYear?.toString() ?? "—"} />
-          <Detail
-            label="Available"
-            value={
-              <Badge variant={book.availableCopies > 0 ? "success" : "secondary"}>
-                {book.availableCopies} {book.availableCopies === 1 ? "copy" : "copies"}
-              </Badge>
-            }
-          />
-        </dl>
-
-        <Separator />
-
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs text-muted-foreground">
-          <Detail label="ID" value={<span className="font-mono">{book.id}</span>} />
-          <Detail label="Added" value={new Date(book.createdAt).toLocaleDateString()} />
-          <Detail label="Updated" value={new Date(book.updatedAt).toLocaleDateString()} />
-        </dl>
-      </CardContent>
-    </Card>
+      </div>
+      <div className="flex shrink-0 flex-col gap-2 text-sm bg-muted p-6 w-60 rounded-md">
+        <Detail label="ISBN" value={book.isbn ?? "—"} />
+        <Detail label="Published" value={book.publishedYear?.toString() ?? "—"} />
+        <Detail
+          label="Available"
+          value={
+            <Badge variant={book.availableCopies > 0 ? "success" : "secondary"}>
+              {book.availableCopies} {book.availableCopies === 1 ? "copy" : "copies"}
+            </Badge>
+          }
+        />
+      </div>
+    </div>
   );
 }
 
@@ -114,8 +101,7 @@ function CheckoutSection({ book }: { book: BookOut }) {
   const checkoutMutation = useCheckoutBook();
 
   const unavailable = book.availableCopies <= 0;
-  const inputEmpty =
-    borrowerType === "user" ? !selectedUserId : !borrowerName.trim();
+  const inputEmpty = borrowerType === "user" ? !selectedUserId : !borrowerName.trim();
 
   function handleTypeChange(t: BorrowerType) {
     setBorrowerType(t);
@@ -255,7 +241,7 @@ function ActiveLoansSection({ bookId }: { bookId: string }) {
   if (!loansQuery.isLoading && loans.length === 0 && !loansQuery.isError) return null;
 
   return (
-    <Card className="max-w-2xl">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle className="text-base">Currently Checked Out</CardTitle>
       </CardHeader>
@@ -263,7 +249,9 @@ function ActiveLoansSection({ bookId }: { bookId: string }) {
         {loansQuery.isLoading && (
           <p className="text-sm text-muted-foreground animate-pulse">Loading…</p>
         )}
-        {loansQuery.isError && <p className="text-sm text-destructive">Failed to load active loans.</p>}
+        {loansQuery.isError && (
+          <p className="text-sm text-destructive">Failed to load active loans.</p>
+        )}
         {!loansQuery.isLoading && loans.length > 0 && (
           <ul className="space-y-2">
             {loans.map((loan, i) => (

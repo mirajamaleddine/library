@@ -1,15 +1,14 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { HttpError } from "@/api/http";
-import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import { useCurrentUser } from "@/features/auth/useCurrentUser";
 import { useBooks, useDeleteBook } from "@/features/books/hooks";
 import { type BookOut, type SortOption } from "@/features/books/types";
 import { cn } from "@/lib/cn";
+import { PlusIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 const SORT_LABELS: Record<SortOption, string> = {
   "createdAt:desc": "Newest first",
@@ -54,54 +53,51 @@ export function Books() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Books</h1>
-        <p className="mt-1 text-muted-foreground">Browse the library catalogue.</p>
+        <h1 className="text-2xl font-medium tracking-tight">Explore Books</h1>
+        <p className="text-muted-foreground">Browse the library catalogue</p>
       </div>
-
-      {canManageBooks && (
-        <div className="flex justify-end">
-          <Link to="/books/new" className={buttonVariants()}>
-            New book
-          </Link>
-        </div>
-      )}
 
       {/* Filter toolbar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <Input
-          className="h-9 w-full sm:w-64"
-          placeholder="Search title or author…"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
-
-        <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border border-input accent-primary cursor-pointer"
-            checked={availableOnly}
-            onChange={(e) => setAvailableOnly(e.target.checked)}
+      <div className="flex flex-wrap items-center justify-between w-full">
+        <div className="flex items-center gap-2 flex-1">
+          <Input
+            className="h-9 w-1/3"
+            placeholder="Search title or author…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
-          Available only
-        </label>
 
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as SortOption)}
-          className={cn(
-            "h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm",
-            "focus:outline-none focus:ring-1 focus:ring-ring",
-          )}
-        >
-          {(Object.entries(SORT_LABELS) as [SortOption, string][]).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+            <Checkbox
+              checked={availableOnly}
+              onCheckedChange={(checked) => setAvailableOnly(checked === true)}
+            />
+            Available only
+          </label>
+
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortOption)}
+            className={cn(
+              "h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm",
+              "focus:outline-none focus:ring-1 focus:ring-ring",
+            )}
+          >
+            {(Object.entries(SORT_LABELS) as [SortOption, string][]).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {canManageBooks && (
+          <Button size="lg">
+            <Link to="/books/new" className={buttonVariants()}>
+              <PlusIcon /> New book
+            </Link>
+          </Button>
+        )}
       </div>
-
-      <Separator />
 
       {/* Book list */}
       {booksQuery.isLoading && (
@@ -119,7 +115,7 @@ export function Books() {
       )}
 
       {books.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-4 lg:grid-cols-8">
           {books.map((book) => (
             <BookCard
               key={book.id}
@@ -159,46 +155,20 @@ function BookCard({
   onDelete: () => void;
 }) {
   return (
-    <Card className="flex flex-col">
-      <CardHeader className="pb-2">
-        <div className="flex gap-3">
-          <BookThumbnail url={book.coverImageUrl} />
-          <div className="min-w-0">
-            <CardTitle className="text-base leading-snug">
-              <Link to={`/books/${book.id}`} className="hover:underline underline-offset-2">
-                {book.title}
-              </Link>
-            </CardTitle>
-            <p className="text-sm text-muted-foreground mt-0.5 truncate">{book.author}</p>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="flex-1 pb-2">
-        <div className="flex flex-wrap gap-1">
-          {book.publishedYear && (
-            <Badge variant="outline" className="text-xs">
-              {book.publishedYear}
-            </Badge>
-          )}
-          <Badge variant={book.availableCopies > 0 ? "success" : "secondary"} className="text-xs">
-            {book.availableCopies} available
-          </Badge>
-        </div>
-      </CardContent>
-      {canManageBooks && (
-        <CardFooter className="pt-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive hover:text-destructive"
-            disabled={deleting}
-            onClick={onDelete}
+    <>
+      <div className="flex flex-col gap-2">
+        <BookThumbnail url={book.coverImageUrl} />
+        <div className="flex flex-col">
+          <Link
+            to={`/books/${book.id}`}
+            className="hover:underline underline-offset-2 text-sm leading-none"
           >
-            {deleting ? "Deleting…" : "Delete"}
-          </Button>
-        </CardFooter>
-      )}
-    </Card>
+            {book.title}
+          </Link>{" "}
+          <span className="text-xs text-muted-foreground truncate">{book.author}</span>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -206,7 +176,7 @@ function BookThumbnail({ url }: { url: string | null }) {
   const [broken, setBroken] = useState(false);
   if (!url || broken) {
     return (
-      <div className="h-16 w-12 shrink-0 rounded bg-muted flex items-center justify-center">
+      <div className="h-40 w-32 shrink-0 rounded bg-muted flex items-center justify-center">
         <span className="text-[9px] text-muted-foreground text-center leading-tight px-1">
           No Cover
         </span>
@@ -217,7 +187,7 @@ function BookThumbnail({ url }: { url: string | null }) {
     <img
       src={url}
       alt="cover"
-      className="h-16 w-12 shrink-0 rounded object-cover border border-border"
+      className="h-40 w-32 shrink-0 rounded object-cover border border-border"
       onError={() => setBroken(true)}
     />
   );
