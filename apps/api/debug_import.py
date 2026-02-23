@@ -3,6 +3,7 @@ import os, sys, traceback, importlib
 print("PWD:", os.getcwd(), flush=True)
 print("sys.path:", sys.path, flush=True)
 
+print("About to import app.main ...", flush=True)
 try:
     importlib.import_module("app.main")
     print("OK: imported app.main", flush=True)
