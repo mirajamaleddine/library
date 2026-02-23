@@ -96,7 +96,7 @@ function SidebarUserBlock() {
     <DropdownMenu>
       <DropdownMenuTrigger>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent
-        className="w-64 rounded-lg"
+        className="w-56 rounded-lg"
         side={isMobile ? "bottom" : "top"}
         align="center"
         sideOffset={4}
@@ -118,7 +118,7 @@ export function AppShell() {
   const crumbs = useBreadcrumbs();
 
   return (
-    <SidebarProvider style={{ "--sidebar-width": "19rem" } as React.CSSProperties}>
+    <SidebarProvider style={{ "--sidebar-width": "16rem" } as React.CSSProperties}>
       <AppSidebar />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 px-4">
@@ -156,6 +156,8 @@ export function AppShell() {
   );
 }
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { pathname } = useLocation();
+
   return (
     <Sidebar variant="floating" {...props}>
       <SidebarHeader>
@@ -176,16 +178,30 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarMenu className="gap-2">
-            {NAV_ITEMS.map((item) => (
-              <SidebarMenuItem key={item.path}>
-                <SidebarMenuButton asChild>
-                  <Link to={item.path} className="font-medium">
-                    {item.title}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
+          <SidebarMenu className="gap-1">
+            {NAV_ITEMS.map((item) => {
+              const isActive = pathname === item.path || pathname.startsWith(`${item.path}/`);
+              const Icon = item.icon;
+
+              return (
+                <SidebarMenuItem key={item.path}>
+                  <SidebarMenuButton asChild isActive={isActive} size="lg">
+                    <Link
+                      to={item.path}
+                      className={cn(
+                        "flex items-center gap-2",
+                        isActive
+                          ? "text-sidebar-accent-foreground font-medium"
+                          : "text-sidebar-foreground",
+                      )}
+                    >
+                      <Icon className="size-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
