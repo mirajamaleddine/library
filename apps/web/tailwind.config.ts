@@ -1,6 +1,6 @@
 import type { Config } from "tailwindcss";
 
-const config: Config = {
+export default {
   darkMode: ["class"],
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
@@ -66,10 +66,8 @@ const config: Config = {
     function ({ matchUtilities, theme }) {
       matchUtilities(
         { "text-shadow": (value) => ({ textShadow: value }) },
-        { values: theme("textShadow") }
+        { values: theme("textShadow") },
       );
     },
   ],
-};
-
-export default config;
+} satisfies Config;
